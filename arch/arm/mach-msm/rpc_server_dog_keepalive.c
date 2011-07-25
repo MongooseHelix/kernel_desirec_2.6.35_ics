@@ -34,7 +34,7 @@ static int handle_rpc_call(struct msm_rpc_server *server,
 	case RPC_DOG_KEEPALIVE_NULL:
 		return 0;
 	case RPC_DOG_KEEPALIVE_BEACON:
-		printk(KERN_INFO "DOG KEEPALIVE PING\n");
+		//printk(KERN_INFO "DOG KEEPALIVE PING\n");
 		return 0;
 	default:
 		return -ENODEV;
