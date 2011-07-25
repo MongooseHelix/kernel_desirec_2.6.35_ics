@@ -644,8 +644,10 @@ static void do_read_data(struct work_struct *work)
 	frag = rr_malloc(hdr.size + sizeof(*frag));
 	frag->next = NULL;
 	frag->length = hdr.size;
-	if (rr_read(frag->data, hdr.size))
+	if (rr_read(frag->data, hdr.size)) {
+		kfree(frag);
 		goto fail_io;
+	}
 
 	ept = rpcrouter_lookup_local_endpoint(hdr.dst_cid);
 	if (!ept) {
