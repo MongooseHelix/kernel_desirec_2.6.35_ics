@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.13
-# Wed Jul 27 14:41:44 2011
+# Wed Jul 27 18:21:12 2011
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -364,6 +364,7 @@ CONFIG_MMC_BUSCLK_PWRSAVE=y
 # CONFIG_ARCH_MSM_FLASHLIGHT is not set
 CONFIG_MICROP_COMMON=y
 # CONFIG_HTC_HEADSET_MGR is not set
+CONFIG_HTC_HEADSET_V1=y
 CONFIG_HTC_ONMODE_CHARGING=y
 # CONFIG_BUILD_CIQ is not set
 # CONFIG_HTC_EXTDIAG is not set

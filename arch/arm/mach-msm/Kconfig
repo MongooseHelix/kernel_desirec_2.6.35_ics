@@ -1563,6 +1563,13 @@ config HTC_HEADSET_PMIC_ADC
 	help
 	  Provides support of HTC PMIC microphone ADC.
 
+config HTC_HEADSET_V1
+	tristate "HTC 2 Wire detection driver"
+	depends on MICROP_I2C
+	default n
+	help
+	  Old headset-driver for our old HTC Hero
+
 config HTC_ONMODE_CHARGING
 	bool "On Mode Charging Icon Support"
 	default n

@@ -182,7 +182,7 @@ typedef enum {
 	H2W_NUM_KEYFUNC	 = 9,
 } KEYFUNC;
 
-extern int turn_mic_bias_on(int on);
+extern int enable_mic_bias(int on);
 
 #endif
 

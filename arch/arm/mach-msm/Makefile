@@ -450,6 +450,7 @@ obj-$(CONFIG_HTC_HEADSET_GPIO) += htc_headset_gpio.o
 obj-$(CONFIG_HTC_HEADSET_MICROP) += htc_headset_microp.o
 obj-$(CONFIG_HTC_HEADSET_PMIC) += htc_headset_pmic.o
 obj-$(CONFIG_HTC_HEADSET_PMIC_ADC) += htc_headset_pmic_adc.o
+obj-$(CONFIG_HTC_HEADSET_V1) += htc_headset_v1.o
 
 obj-$(CONFIG_HTC_EXTDIAG) += htc_extdiag.o
 
