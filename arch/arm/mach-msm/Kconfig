@@ -1029,7 +1029,6 @@ config MSM_ONCRPCROUTER_DEBUG
 	  Support for debugging the ONCRPC router for communication
 	  between the ARM9 and ARM11
 
-if QCT_LTE || ARCH_MSM8X60
 choice
 	prompt "MSM Shared memory interface version"
 	depends on MSM_SMD
@@ -1045,6 +1044,7 @@ choice
 	    prompt "Package 4"
 endchoice
 
+if QCT_LTE || ARCH_MSM8X60
 config MSM_RPC_SDIO_XPRT
 	depends on MSM_SDIO_AL
 	default y
