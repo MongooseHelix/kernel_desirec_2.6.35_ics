@@ -538,13 +538,6 @@ static struct platform_device msm_camera_sensor_mt9p012 = {
 	},
 };
 
-#ifdef CONFIG_HERO_EXPERIMENTAL_USBADSP
-/*static int mahimahi_phy_init_seq[] = {
-	0x0C, 0x31,
-	0x31, 0x32,
-	0x1D, 0x0D,
-	0x1D, 0x10,
-	-1 }; MAHIMAHI */
 static int hero_phy_init_seq[] = {0x40, 0x31, 0x1, 0x0D, 0x1, 0x10, -1};
 
 static void hero_usb_phy_reset(void)
@@ -826,33 +819,6 @@ static struct platform_device ram_console_device = {
 	.num_resources = ARRAY_SIZE(ram_console_resources),
 	.resource      = ram_console_resources,
 };
-
-#else /* !CONFIG_HERO_EXPERIMENTAL_USBADSP */
-
-static void hero_phy_reset(void)
-{
-	gpio_set_value(HERO_GPIO_USB_PHY_RST_N, 0);
-	mdelay(10);
-	gpio_set_value(HERO_GPIO_USB_PHY_RST_N, 1);
-	mdelay(10);
-}
-
-static struct msm_pmem_setting pmem_setting_32 = {
-	.pmem_start        = SMI32_MSM_PMEM_MDP_BASE,
-	.pmem_size         = SMI32_MSM_PMEM_MDP_SIZE,
-	.pmem_adsp_start   = SMI32_MSM_PMEM_ADSP_BASE,
-	.pmem_adsp_size    = SMI32_MSM_PMEM_ADSP_SIZE,
-	.pmem_gpu0_start   = SMI32_MSM_PMEM_GPU0_BASE,
-	.pmem_gpu0_size    = SMI32_MSM_PMEM_GPU0_SIZE,
-	.pmem_gpu1_start   = SMI32_MSM_PMEM_GPU1_BASE,
-	.pmem_gpu1_size    = SMI32_MSM_PMEM_GPU1_SIZE,
-	.pmem_camera_start = SMI32_MSM_PMEM_CAMERA_BASE,
-	.pmem_camera_size  = SMI32_MSM_PMEM_CAMERA_SIZE,
-	.ram_console_start = SMI32_MSM_RAM_CONSOLE_BASE,
-	.ram_console_size  = SMI32_MSM_RAM_CONSOLE_SIZE,
-};
-
-#endif
 
 static struct pwr_sink hero_pwrsink_table[] = {
 	{
@@ -1215,7 +1181,6 @@ static struct platform_device *devices[] __initdata = {
 	&hero_pwr_sink,
 #endif
 	&hero_snd,
-#ifdef CONFIG_HERO_EXPERIMENTAL_USBADSP
 	&msm_device_hsusb,
 	&usb_mass_storage_device,
 #ifdef CONFIG_USB_ANDROID_RNDIS
@@ -1227,7 +1192,6 @@ static struct platform_device *devices[] __initdata = {
 	&android_pmem_camera_device,
 	&hw3d_device,
 	&ram_console_device,
-#endif
 };
 
 extern struct sys_timer msm_timer;
@@ -1363,9 +1327,7 @@ static void __init hero_init(void)
 	int rc;
 	printk("hero_init() revision = 0x%X\n", system_rev);
 
-#ifdef CONFIG_HERO_EXPERIMENTAL_USBADSP
 	android_usb_pdata.serial_number = board_serialno();
-#endif
 
 	/*
 	 * Setup common MSM GPIOS
@@ -1393,12 +1355,7 @@ static void __init hero_init(void)
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
 #endif
 
-#ifdef CONFIG_HERO_EXPERIMENTAL_USBADSP
 	msm_device_hsusb.dev.platform_data = &msm_hsusb_pdata;
-#else
-	msm_add_usb_devices(hero_phy_reset, NULL);
-	msm_add_mem_devices(&pmem_setting_32);
-#endif
 
 	msm_init_pmic_vibrator(3000);
 

@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.13
-# Wed Jul 27 20:42:32 2011
+# Thu Jul 28 03:47:03 2011
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -292,7 +292,6 @@ CONFIG_MSM_DEBUG_UART_NONE=y
 # CONFIG_MACH_TROUT is not set
 # CONFIG_MACH_SAPPHIRE is not set
 CONFIG_MACH_HERO=y
-CONFIG_HERO_EXPERIMENTAL_USBADSP=y
 # CONFIG_MACH_DESIREC is not set
 # CONFIG_MACH_HEROC is not set
 # CONFIG_QCT_LTE is not set
