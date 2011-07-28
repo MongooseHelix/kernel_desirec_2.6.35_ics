@@ -27,6 +27,7 @@
 #include <linux/module.h>
 #include <linux/notifier.h>
 #include <linux/memcontrol.h>
+#include <linux/oomcontrol.h>
 #include <linux/security.h>
 
 int sysctl_panic_on_oom;
@@ -245,11 +246,13 @@ static enum oom_constraint constrained_alloc(struct zonelist *zonelist,
  * (not docbooked, we don't want this one cluttering up the manual)
  */
 static struct task_struct *select_bad_process(unsigned long *ppoints,
-						struct mem_cgroup *mem)
+			struct mem_cgroup *mem, int cpuset_constrained)
 {
 	struct task_struct *p;
 	struct task_struct *chosen = NULL;
 	struct timespec uptime;
+	u64 chosenpriority = 1, taskpriority;
+
 	*ppoints = 0;
 
 	do_posix_clock_monotonic_gettime(&uptime);
@@ -302,9 +305,32 @@ static struct task_struct *select_bad_process(unsigned long *ppoints,
 			continue;
 
 		points = badness(p, uptime.tv_sec);
-		if (points > *ppoints || !chosen) {
+
+		taskpriority = task_oom_priority(p);
+
+		/*
+		 * select this task if
+		 * 1. It has higher oom.priority than the previously selected
+		 * task, or
+		 * 2. It has the same priority as previously selected task but
+		 * higher badness score, or
+		 * 3. If this is the first task to be considered and it is not
+		 * protected from oom killer by setting priority as zero, or
+		 * 4. If this is a cpuset constrained oom and
+		 * honour_cpuset_constraint is set
+		 */
+		if (taskpriority > chosenpriority ||
+
+			(((taskpriority == chosenpriority) ||
+			  (cpuset_constrained &&
+				atomic_read(&honour_cpuset_constraint)))
+			 && points > *ppoints) ||
+
+			(taskpriority && !chosen)) {
+
 			chosen = p;
 			*ppoints = points;
+			chosenpriority = taskpriority;
 		}
 	}
 
@@ -478,7 +504,7 @@ void mem_cgroup_out_of_memory(struct mem_cgroup *mem, gfp_t gfp_mask)
 		panic("out of memory(memcg). panic_on_oom is selected.\n");
 	read_lock(&tasklist_lock);
 retry:
-	p = select_bad_process(&points, mem);
+	p = select_bad_process(&points, mem, 0); /* not cpuset constrained */
 	if (!p || PTR_ERR(p) == -1UL)
 		goto out;
 
@@ -557,7 +583,7 @@ void clear_zonelist_oom(struct zonelist *zonelist, gfp_t gfp_mask)
 /*
  * Must be called with tasklist_lock held for read.
  */
-static void __out_of_memory(gfp_t gfp_mask, int order)
+static void __out_of_memory(gfp_t gfp_mask, int order, int cpuset_constrained)
 {
 	struct task_struct *p;
 	unsigned long points;
@@ -571,7 +597,7 @@ retry:
 	 * Rambo mode: Shoot down a process and hope it solves whatever
 	 * issues we may have.
 	 */
-	p = select_bad_process(&points, NULL);
+	p = select_bad_process(&points, NULL, cpuset_constrained);
 
 	if (PTR_ERR(p) == -1UL)
 		return;
@@ -605,7 +631,8 @@ void pagefault_out_of_memory(void)
 		panic("out of memory from page fault. panic_on_oom is selected.\n");
 
 	read_lock(&tasklist_lock);
-	__out_of_memory(0, 0); /* unknown gfp_mask and order */
+	/* unknown gfp_mask and order and not cpuset constrained */
+	__out_of_memory(0, 0, 0);
 	read_unlock(&tasklist_lock);
 
 	/*
@@ -663,7 +690,7 @@ void out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
 		}
 		/* Fall-through */
 	case CONSTRAINT_CPUSET:
-		__out_of_memory(gfp_mask, order);
+		__out_of_memory(gfp_mask, order, 1);
 		break;
 	}
 

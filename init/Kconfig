@@ -566,6 +566,14 @@ config CGROUP_DEBUG
 
 	  Say N if unsure.
 
+config CGROUP_OOM
+	bool "Oom cgroup subsystem"
+	depends on CGROUPS
+	help
+	  This provides a cgroup subsystem which aids controlling
+	  the order in which tasks whould be killed during
+	  out of memory situations.
+
 config CGROUP_NS
 	bool "Namespace cgroup subsystem"
 	depends on CGROUPS

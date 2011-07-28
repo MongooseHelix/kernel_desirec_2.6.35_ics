@@ -71,4 +71,8 @@ SUBSYS(blkio)
 SUBSYS(bfqio)
 #endif
 
+#ifdef CONFIG_CGROUP_OOM
+SUBSYS(oom)
+#endif
+
 /* */

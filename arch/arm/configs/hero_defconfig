@@ -1,7 +1,7 @@
 #
 # Automatically generated make config: don't edit
 # Linux kernel version: 2.6.35.13
-# Thu Jul 28 03:47:03 2011
+# Thu Jul 28 16:42:19 2011
 #
 CONFIG_ARM=y
 CONFIG_SYS_SUPPORTS_APM_EMULATION=y
@@ -71,6 +71,7 @@ CONFIG_IKCONFIG_PROC=y
 CONFIG_LOG_BUF_SHIFT=17
 CONFIG_CGROUPS=y
 # CONFIG_CGROUP_DEBUG is not set
+# CONFIG_CGROUP_OOM is not set
 # CONFIG_CGROUP_NS is not set
 CONFIG_CGROUP_FREEZER=y
 # CONFIG_CGROUP_DEVICE is not set
