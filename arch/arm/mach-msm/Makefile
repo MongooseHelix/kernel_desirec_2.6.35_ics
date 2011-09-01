@@ -351,7 +351,8 @@ obj-$(CONFIG_MACH_DESIREC) += board-desirec-rfkill.o
 obj-$(CONFIG_MACH_DESIREC) += board-desirec-mmc.o board-desirec-wifi.o htc_wifi_nvs.o
 obj-$(CONFIG_MACH_HEROC) += board-heroc.o board-heroc-panel.o board-heroc-keypad.o
 obj-$(CONFIG_MACH_HEROC) += board-heroc-rfkill.o
-obj-$(CONFIG_MACH_HEROC) += board-heroc-mmc.o board-heroc-wifi.o htc_wifi_nvs.o
+obj-$(CONFIG_MACH_HEROC) += board-heroc-mmc.o board-heroc-wifi.o htc_wifi_nvs.o htc_awb_cal.o
+obj-$(CONFIG_MACH_HEROC) += htc_bluetooth.o board-heroc-tpa6130.o
 
 # MSM8x60 boards
 obj-$(CONFIG_MACH_PYRAMID) += board-pyramid.o
@@ -451,6 +452,7 @@ obj-$(CONFIG_HTC_HEADSET_MICROP) += htc_headset_microp.o
 obj-$(CONFIG_HTC_HEADSET_PMIC) += htc_headset_pmic.o
 obj-$(CONFIG_HTC_HEADSET_PMIC_ADC) += htc_headset_pmic_adc.o
 obj-$(CONFIG_HTC_HEADSET_V1) += htc_headset_v1.o
+obj-$(CONFIG_HTC_AUDIOJACK_V1) += htc_audio_jack_v1.o
 
 obj-$(CONFIG_HTC_EXTDIAG) += htc_extdiag.o
 

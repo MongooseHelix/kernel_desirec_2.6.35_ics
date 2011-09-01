@@ -1025,9 +1025,12 @@ config MSM_ONCRPCROUTER_DEBUG
 
 choice
 	prompt "MSM Shared memory interface version"
-	depends on MSM_SMD
 	default MSM_SMD_PKG3 if ARCH_MSM_ARM11
 	default MSM_SMD_PKG4 if ARCH_MSM_SCORPION
+
+	config MSM_SMD
+	  bool
+	    prompt "No Package"
 
 	config MSM_SMD_PKG3
 	  bool
@@ -1563,6 +1566,14 @@ config HTC_HEADSET_V1
 	default n
 	help
 	  Old headset-driver for our old HTC Hero
+
+config HTC_AUDIOJACK_V1
+	tristate "Audio Jack detection driver"
+	depends on HTC_HEADSET_V1
+	default n
+	help
+	  Provides support for detecting audio jack, such as 3.5mm
+	  earphone, on the android platform
 
 config HTC_ONMODE_CHARGING
 	bool "On Mode Charging Icon Support"
