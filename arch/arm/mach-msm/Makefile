@@ -352,7 +352,7 @@ obj-$(CONFIG_MACH_DESIREC) += board-desirec-mmc.o board-desirec-wifi.o htc_wifi_
 obj-$(CONFIG_MACH_HEROC) += board-heroc.o board-heroc-panel.o board-heroc-keypad.o
 obj-$(CONFIG_MACH_HEROC) += board-heroc-rfkill.o
 obj-$(CONFIG_MACH_HEROC) += board-heroc-mmc.o board-heroc-wifi.o htc_wifi_nvs.o htc_awb_cal.o
-obj-$(CONFIG_MACH_HEROC) += htc_bluetooth.o board-heroc-tpa6130.o
+obj-$(CONFIG_MACH_HEROC) += board-heroc-tpa6130.o
 
 # MSM8x60 boards
 obj-$(CONFIG_MACH_PYRAMID) += board-pyramid.o
