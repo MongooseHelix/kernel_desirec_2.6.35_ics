@@ -1025,10 +1025,11 @@ config MSM_ONCRPCROUTER_DEBUG
 
 choice
 	prompt "MSM Shared memory interface version"
+	depends on MSM_SMD
 	default MSM_SMD_PKG3 if ARCH_MSM_ARM11
 	default MSM_SMD_PKG4 if ARCH_MSM_SCORPION
 
-	config MSM_SMD
+	config MSM_SMD_NONE
 	  bool
 	    prompt "No Package"
 
