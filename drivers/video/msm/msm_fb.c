@@ -1107,7 +1107,7 @@ static struct file_operations debug_fops = {
 };
 #endif
 
-#if defined(CONFIG_MACH_HERO) || defined(CONFIG_MACH_BUZZ)
+#if defined(CONFIG_ARCH_MSM7X00A) || defined(CONFIG_ARCH_MSM7225)
 #define BITS_PER_PIXEL_DEF 16
 #else
 #define BITS_PER_PIXEL_DEF 32
@@ -1203,14 +1203,11 @@ static int setup_fbmem(struct msmfb_info *msmfb, struct platform_device *pdev)
 	resource_size = resource->end - resource->start + 1;
 
 	/* check the resource is large enough to fit the fb */
-	/* HEROC: currently this check fails, bypass until fixed */
-#if !defined(CONFIG_MACH_HEROC)
 	if (resource_size < size) {
 		PR_DISP_ERR("msmfb: allocated resource is too small for "
 				"fb\n");
 		return -ENOMEM;
 	}
-#endif
 	fb->fix.smem_start = resource->start;
 	fb->fix.smem_len = resource_size;
 	fbram = ioremap(resource->start, resource_size);
