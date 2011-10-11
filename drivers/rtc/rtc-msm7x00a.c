@@ -112,6 +112,8 @@ msmrtc_timeremote_set_time(struct device *dev, struct rtc_time *tm)
 				&req, sizeof(req),
 				&rep, sizeof(rep),
 				5 * HZ);
+	if (rc < 0)
+		pr_err("%s: msm_rpc_call_reply fail (%d)\n", __func__, rc);
 	return rc;
 }
 
@@ -137,8 +139,10 @@ msmrtc_timeremote_read_time(struct device *dev, struct rtc_time *tm)
 				&req, sizeof(req),
 				&rep, sizeof(rep),
 				5 * HZ);
-	if (rc < 0)
+	if (rc < 0) {
+		pr_err("%s: msm_rpc_call_reply fail (%d)\n", __func__, rc);
 		return rc;
+	}
 
 	if (!be32_to_cpu(rep.opt_arg)) {
 		printk(KERN_ERR "%s: No data from RTC\n", __func__);
@@ -215,8 +219,10 @@ msmrtc_timeremote_read_ticks(struct device *dev, struct timespec *ticks)
 				&req, sizeof(req),
 				&rep, sizeof(rep),
 				5 * HZ);
-	if (rc < 0)
+	if (rc < 0) {
+		pr_err("%s: msm_rpc_call_reply fail (%d)\n", __func__, rc);
 		return rc;
+	}
 
 	get_ticks = be32_to_cpu(rep.sync_ticks);
 	*ticks = ns_to_timespec(get_ticks*NSEC_PER_MSEC);
