@@ -60,6 +60,9 @@
 #include <mach/msm_fb.h>
 #include <mach/h2w_v1.h>
 #include <mach/audio_jack.h>
+#include <mach/htc_headset_mgr.h>
+#include <mach/htc_headset_gpio.h>
+#include <mach/htc_headset_microp.h>
 #include <mach/microp_i2c.h>
 #include <mach/htc_battery.h>
 #include <mach/perflock.h>
@@ -935,6 +938,7 @@ static struct platform_device heroc_h2w = {
 	},
 };
 
+#if 0
 static struct audio_jack_platform_data heroc_jack_data = {
     .gpio = HEROC_GPIO_35MM_HEADSET_DET,
 };
@@ -944,6 +948,60 @@ static struct platform_device heroc_audio_jack = {
     .id = -1,
     .dev = {
     .platform_data = &heroc_jack_data,
+    },
+};
+#endif
+
+/* HTC_HEADSET_GPIO Driver */
+static struct htc_headset_gpio_platform_data htc_headset_gpio_data = {
+    .hpin_gpio      = HEROC_GPIO_35MM_HEADSET_DET,
+    .key_enable_gpio    = 0,
+    .mic_select_gpio    = 0,
+};
+
+static struct platform_device htc_headset_gpio = {
+    .name   = "HTC_HEADSET_GPIO",
+    .id = -1,
+    .dev    = {
+        .platform_data = &htc_headset_gpio_data,
+    },
+};
+
+/* HTC_HEADSET_MICROP Driver */
+static struct htc_headset_microp_platform_data htc_headset_microp_data = {
+	.remote_int		= 1 << 5,
+	.remote_irq		= MSM_uP_TO_INT(5),
+	.remote_enable_pin	= 0,
+	.adc_channel		= 0x01,
+	.adc_remote		= {0, 33, 38, 82, 95, 167},
+};
+
+static struct platform_device htc_headset_microp = {
+	.name	= "HTC_HEADSET_MICROP",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &htc_headset_microp_data,
+	},
+};
+
+/* HTC_HEADSET_MGR Driver */
+static struct platform_device *headset_devices[] = {
+    &heroc_h2w,
+	&htc_headset_microp,
+	&htc_headset_gpio,
+	/* Please put the headset detection driver on the last */
+};
+
+static struct htc_headset_mgr_platform_data htc_headset_mgr_data = {
+	.headset_devices_num	= ARRAY_SIZE(headset_devices),
+	.headset_devices	= headset_devices,
+};
+
+static struct platform_device heroc_headset_mgr = {
+    .name   = "HTC_HEADSET_MGR",
+    .id = -1,
+    .dev    = {
+        .platform_data = &htc_headset_mgr_data,
     },
 };
 
@@ -1031,8 +1089,9 @@ static struct platform_device *devices[] __initdata = {
 	&msm_camera_sensor_s5k3e2fx,
 	&htc_battery_pdev,
 	&heroc_rfkill,
-	&heroc_h2w,
-	&heroc_audio_jack,
+	&heroc_headset_mgr,
+//	&heroc_h2w,
+//	&heroc_audio_jack,
 #ifdef CONFIG_HTC_PWRSINK
 	&heroc_pwr_sink,
 #endif

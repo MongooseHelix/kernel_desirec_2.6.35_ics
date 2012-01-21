@@ -161,7 +161,7 @@ static ssize_t pca963x_grppwm_store(struct device *dev,
 
 static DEVICE_ATTR(grppwm, 0644, pca963x_grppwm_show, pca963x_grppwm_store);
 
-static void led_brightness_set(struct led_classdev *led_cdev,
+static void pca963x_led_brightness_set(struct led_classdev *led_cdev,
 			       enum led_brightness brightness)
 {
 	struct pca963x_data *pca963x;
@@ -313,15 +313,15 @@ static int pca963x_probe(struct i2c_client *client,
 
 	pca963x->leds[0].name = "blue";
 	pca963x->leds[0].brightness = LED_OFF;
-	pca963x->leds[0].brightness_set = led_brightness_set;
+	pca963x->leds[0].brightness_set = pca963x_led_brightness_set;
 
 	pca963x->leds[1].name = "green";
 	pca963x->leds[1].brightness = LED_OFF;
-	pca963x->leds[1].brightness_set = led_brightness_set;
+	pca963x->leds[1].brightness_set = pca963x_led_brightness_set;
 
 	pca963x->leds[2].name = "red";
 	pca963x->leds[2].brightness = LED_OFF;
-	pca963x->leds[2].brightness_set = led_brightness_set;
+	pca963x->leds[2].brightness_set = pca963x_led_brightness_set;
 
 	pca963x->dirty = 0;
 	pca963x->status = 0;
