@@ -28,16 +28,17 @@
 
 #include <mach/msm_fb.h>
 #include <mach/vreg.h>
-#include <mach/pmic.h>
+#include <mach/board.h>
 #include <mach/board_htc.h>
+
 #include "proc_comm.h"
 #include "devices.h"
 #include "board-desirec.h"
 
-#if 1
+#if 0
 #define B(s...) printk(s)
 #else
-#define B(s...) do {} while (0)
+#define B(s...) do {} while(0)
 #endif
 
 static struct led_trigger *desirec_lcd_backlight;
@@ -46,7 +47,7 @@ static void desirec_set_backlight(int on)
 	B(KERN_DEBUG "%s: enter.\n", __func__);
 	if (on) {
 		/* vsync back porch is about 17 ms */
-		mdelay(40);
+		msleep(40);
 		led_trigger_event(desirec_lcd_backlight, LED_FULL);
 	} else
 		led_trigger_event(desirec_lcd_backlight, LED_OFF);
@@ -96,7 +97,6 @@ desirec_mddi_eid_power(struct msm_mddi_client_data *client_data, int on)
 	}
 }
 
-/*need to sync with mddi_client_eid.c*/
 enum {
 	PANEL_SHARP,
 	PANEL_SAMSUNG,
@@ -136,7 +136,7 @@ desirec_panel_blank(struct msm_mddi_bridge_platform_data *bridge_data,
 	return 0;
 }
 
-static void panel_eid_fixup(uint16_t * mfr_name, uint16_t * product_code)
+static void panel_eid_fixup(uint16_t *mfr_name, uint16_t *product_code)
 {
 	B("%s: enter.\n", __func__);
 	*mfr_name = 0x0101;
@@ -153,7 +153,7 @@ static int config_vsync(void)
 		return ret;
 
 	config = PCOM_GPIO_CFG(DESIREC_GPIO_VSYNC, 1, GPIO_INPUT,
-			GPIO_PULL_DOWN, GPIO_2MA);
+				GPIO_PULL_DOWN, GPIO_2MA);
 	ret = msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, &config, 0);
 	if (ret)
 		gpio_free(DESIREC_GPIO_VSYNC);
@@ -175,8 +175,8 @@ static struct msm_mddi_bridge_platform_data eid_client_data = {
 
 static struct resource resources_msm_fb[] = {
 	{
-		.start = MSM_FB_BASE,
-		.end = MSM_FB_BASE + MSM_FB_SIZE - 1,
+		.start = SMI32_MSM_FB_BASE,
+		.end = SMI32_MSM_FB_BASE + SMI32_MSM_FB_SIZE - 1,
 		.flags = IORESOURCE_MEM,
 	},
 };
@@ -227,13 +227,14 @@ int __init desirec_init_panel(void)
 	panel = desirec_panel_detect();
 
 	if (panel == PANEL_HEROC_EID_BOTTOM ||
-	    panel == PANEL_EIDII ||
-	    panel == PANEL_HEROC_TPO) {
+		panel == PANEL_EIDII ||
+		panel == PANEL_HEROC_TPO) {
 		printk(KERN_INFO "%s: init %s panel\n", __func__,
 			panel == PANEL_HEROC_TPO ? "TPO" : "EID");
 		config->panel_id = panel;
 		config->caps = MSMFB_CAP_CABC;
-		if (panel == PANEL_HEROC_EID_BOTTOM || panel == PANEL_EIDII)
+		if (panel == PANEL_HEROC_EID_BOTTOM ||
+			panel == PANEL_EIDII)
 			config->pwm = pwm_eid;
 		else
 			config->pwm = pwm_tpo;
@@ -245,10 +246,6 @@ int __init desirec_init_panel(void)
 	}
 
 	rc = platform_device_register(&msm_device_mdp);
-	if (rc)
-		return rc;
-
-	rc = config_vsync();
 	if (rc)
 		return rc;
 
@@ -264,4 +261,3 @@ int __init desirec_init_panel(void)
 	return 0;
 }
 device_initcall(desirec_init_panel);
-

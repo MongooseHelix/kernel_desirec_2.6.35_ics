@@ -21,6 +21,7 @@
 #include <linux/vmalloc.h>
 #include <linux/err.h>
 #include <linux/wifi_tiwlan.h>
+#include <asm/mach-types.h>
 
 extern int desirec_wifi_set_carddetect(int val);
 extern int desirec_wifi_power(int on);
@@ -84,14 +85,16 @@ static struct platform_device wifi_ctrl_dev = {
 static int __init desirec_wifi_init(void)
 {
 	int ret;
-
+	int rc = 0;
 	if (!machine_is_desirec())
 		return 0;
 
-	printk("%s: start\n", __func__);
-
 #ifdef CONFIG_WIFI_MEM_PREALLOC
-	desirec_init_wifi_mem();
+	rc = desirec_init_wifi_mem();
+	if (rc) {
+		printk(KERN_CRIT "%s: WiFi memory init failure (%d)\n",
+		       __func__, rc);
+	}
 #endif
 
 	ret = platform_device_register(&wifi_ctrl_dev);
@@ -101,4 +104,3 @@ static int __init desirec_wifi_init(void)
 
 late_initcall(desirec_wifi_init);
 #endif
-

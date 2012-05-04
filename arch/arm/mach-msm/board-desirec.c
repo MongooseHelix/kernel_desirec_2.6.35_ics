@@ -24,53 +24,61 @@
 #include <linux/switch.h>
 #include <linux/synaptics_i2c_rmi.h>
 #include <linux/melfas_tsi.h>
-#include <mach/cy8c_i2c.h>
+#include <linux/capella_cm3602.h>
 #include <linux/akm8973.h>
-#include <mach/tpa6130.h>
-#include <linux/bma150.h>
 #include <linux/sysdev.h>
+#include <linux/android_pmem.h>
+#include <linux/bma150.h>
+#include <linux/usb/android_composite.h>
+#include <linux/usb/f_accessory.h>
 #include <linux/delay.h>
-#include <mach/drv_callback.h>
+#include <linux/gpio_event.h>
+#include <linux/mtd/nand.h>
+#include <linux/mtd/partitions.h>
+#include <linux/mmc/sdio_ids.h>
 #include <linux/proximity.h>
-#include <linux/gpio.h>
 
+#include <asm/gpio.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/flash.h>
 #include <asm/system.h>
 #include <asm/io.h>
+#include <asm/delay.h>
 #include <asm/setup.h>
+#include <asm/mach/mmc.h>
 
-#include <linux/gpio_event.h>
-#include <linux/mtd/nand.h>
-#include <linux/mtd/partitions.h>
-#include <linux/mmc/sdio_ids.h>
-#include <linux/capella_cm3602.h>
-
+#include <mach/tpa6130.h>
+#include <mach/hardware.h>
 #include <mach/system.h>
 #include <mach/vreg.h>
-#include <mach/hardware.h>
+#include <mach/msm_hsusb.h>
+#include <mach/msm_iomap.h>
 #include <mach/board.h>
-#include <mach/msm_serial_hs.h>
-#include <mach/msm_fb.h>
-#include "proc_comm.h"
-#include "devices.h"
-#include <mach/h2w_v1.h>
-#include <mach/audio_jack.h>
-#include <mach/microp_i2c.h>
-#include <mach/htc_battery.h>
-#include <mach/htc_pwrsink.h>
-#include <mach/perflock.h>
-#include "board-desirec.h"
-#include "board-desirec-camsensor.h"
 #include <mach/board_htc.h>
 #include <mach/msm_serial_debugger.h>
+#include <mach/msm_serial_hs.h>
+#include <mach/htc_pwrsink.h>
+#include <mach/msm_fb.h>
+#include <mach/h2w_v1.h>
+#include <mach/audio_jack.h>
+#include <mach/htc_headset_mgr.h>
+#include <mach/htc_headset_gpio.h>
+#include <mach/htc_headset_microp.h>
+#include <mach/microp_i2c.h>
+#include <mach/htc_battery.h>
+#ifdef CONFIG_PERFLOCK
+#include <mach/perflock.h>
+#endif
+#include <mach/drv_callback.h>
+
+#include "proc_comm.h"
+#include "devices.h"
+#include "gpio_chip.h"
+#include "board-desirec.h"
 
 static struct htc_battery_platform_data htc_battery_pdev_data = {
-//	.gpio_mbat_in = HERO_GPIO_MBAT_IN,
-//	.gpio_mchg_en_n = HERO_GPIO_MCHG_EN_N,
-//	.gpio_iset = HERO_GPIO_ISET,
 	.guage_driver = GUAGE_MODEM,
 	.charger = LINEAR_CHARGER,
 	.m2a_cable_detect = 1,
@@ -84,7 +92,7 @@ static struct platform_device htc_battery_pdev = {
 	},
 };
 
-static int touch_reset(void)
+static int touch_reset(void)	//used by melfas ts
 {
 	printk(KERN_INFO"%s: enter\n", __func__);
 	gpio_set_value(DESIREC_GPIO_TP_EN, 0);
@@ -97,20 +105,6 @@ static int touch_reset(void)
 
 	return 0;
 }
-
-/*
-static struct proximity_platform_data desirec_proximity_data = {
-	.intr = DESIREC_GPIO_PROXIMITY_INT_N,
-	.enable = DESIREC_GPIO_PROXIMITY_POWER_N,
-};
-
-static struct platform_device desirec_proximity_device = {
-	.name = "proximity_sensor",
-	.dev		= {
-		.platform_data	= &desirec_proximity_data,
-	},
-};
-*/
 
 static struct melfas_i2c_rmi_platform_data desirec_melfas_ts_data[] = {
 	{
@@ -137,9 +131,6 @@ static struct synaptics_i2c_rmi_platform_data desirec_ts_data[] = {
 		.inactive_top = -5 * 0x10000 / 480,
 		.inactive_bottom = -35 * 0x10000 / 480,
 		.dup_threshold = 10,
-		.display_width = 320,
-		.display_height = 480,
-
 	},
 	{
 		.version = 0x0100,
@@ -149,9 +140,7 @@ static struct synaptics_i2c_rmi_platform_data desirec_ts_data[] = {
 		.inactive_top = -5 * 0x10000 / 480,
 		.inactive_bottom = -35 * 0x10000 / 480,
 		.dup_threshold = 10,
-		.display_width = 320,
-		.display_height = 480,
-	},
+	}
 };
 
 
@@ -346,8 +335,41 @@ static struct microp_i2c_platform_data microp_data = {
 	.gpio_reset = DESIREC_GPIO_UP_RESET_N,
 	.cabc_backlight_enable = 1,
 	.microp_enable_early_suspend = 1,
+	.microp_mic_status = 0,
 	.microp_enable_reset_button = 1,
 };
+
+void desirec_headset_mic_select(uint8_t select)
+{
+//	microp_i2c_set_pin_mode(4, select, microp_data.dev_id);
+}
+
+#if 0
+// Stolen from GSM Hero, good candidate for snippage.
+static void desirec_microp_intr_function(uint8_t *pin_status)
+{
+	static int last_insert = 0;
+	int insert;
+	/*
+	printk(KERN_INFO "desirec_microp_intr_function : %02X %02X %02X\n",
+		pin_status[0], pin_status[1], pin_status[2]);
+	*/
+	if (pin_status[1] & 0x01) {
+		insert = 0;
+	} else {
+		insert = 1;
+	}
+
+	if (last_insert != insert) {
+		printk(KERN_INFO "desirec_microp_intr_function : %s\n", insert ? "inserted" : "not inserted");
+		microp_i2c_set_pin_mode(4, insert, microp_data.dev_id);
+#ifdef CONFIG_HTC_HEADSET_V1
+		cnf_driver_event("H2W_extend_headset", &insert);
+#endif
+		last_insert = insert;
+	}
+}
+#endif
 
 static struct akm8973_platform_data compass_platform_data = {
 	.layouts = DESIREC_LAYOUTS,
@@ -369,37 +391,48 @@ static struct i2c_board_info i2c_devices[] = {
 	{
 		I2C_BOARD_INFO(SYNAPTICS_I2C_RMI_NAME, 0x20),
 		.platform_data = &desirec_ts_data,
-		.irq = DESIREC_GPIO_TO_INT(DESIREC_GPIO_TP_ATT_N)
+		.irq = MSM_GPIO_TO_INT(DESIREC_GPIO_TP_ATT_N)
 	},
 	{
 		I2C_BOARD_INFO(MELFAS_I2C_NAME, 0x22),
 		.platform_data = &desirec_melfas_ts_data,
-		.irq = DESIREC_GPIO_TO_INT(DESIREC_GPIO_TP_ATT_N)
+		.irq = MSM_GPIO_TO_INT(DESIREC_GPIO_TP_ATT_N)
 	},
 	{
 		I2C_BOARD_INFO(MICROP_I2C_NAME, 0xCC >> 1),
 		.platform_data = &microp_data,
-		.irq = DESIREC_GPIO_TO_INT(DESIREC_GPIO_UP_INT_N)
+		.irq = MSM_GPIO_TO_INT(DESIREC_GPIO_UP_INT_N)
 	},
 	{
 		I2C_BOARD_INFO(AKM8973_I2C_NAME, 0x1C),
 		.platform_data = &compass_platform_data,
-		.irq = DESIREC_GPIO_TO_INT(DESIREC_GPIO_COMPASS_INT_N),
+		.irq = MSM_GPIO_TO_INT(DESIREC_GPIO_COMPASS_INT_N),
 	},
 	{
 		I2C_BOARD_INFO(BMA150_I2C_NAME, 0x38),
 		.platform_data = &gsensor_platform_data,
-		.irq = DESIREC_GPIO_TO_INT(DESIREC_GPIO_GSENSOR_INT_N),
+		.irq = MSM_GPIO_TO_INT(DESIREC_GPIO_GSENSOR_INT_N),
 	},
-
 	{
 		I2C_BOARD_INFO(TPA6130_I2C_NAME, 0xC0 >> 1),
 		.platform_data = &headset_amp_platform_data,
 	},
-
 	{
 		I2C_BOARD_INFO("s5k3e2fx", 0x20 >> 1)
 	}
+};
+
+static struct resource msm_camera_resources[] = {
+        {
+                .start  = MSM_VFE_PHYS,
+                .end    = MSM_VFE_PHYS + MSM_VFE_SIZE - 1,
+                .flags  = IORESOURCE_MEM,
+        },
+        {
+                .start  = INT_VFE,
+                 INT_VFE,
+                .flags  = IORESOURCE_IRQ,
+        },
 };
 
 static struct msm_camera_device_platform_data msm_camera_device_data = {
@@ -412,13 +445,13 @@ static struct msm_camera_device_platform_data msm_camera_device_data = {
 };
 
 static struct msm_camera_sensor_info msm_camera_sensor_s5k3e2fx_data = {
-	.sensor_name    = "s5k3e2fx",
-	.sensor_reset   = DESIREC_GPIO_CAM_RST_N,
-	.sensor_pwd     = DESIREC_CAM_PWDN,
-	.vcm_pwd        = DESIREC_GPIO_VCM_PWDN,
-	.pdata          = &msm_camera_device_data,
-	.flash_type     = MSM_CAMERA_FLASH_NONE,
-	.need_suspend   = 1,
+	 .sensor_name    = "s5k3e2fx",
+	 .sensor_reset   = DESIREC_GPIO_CAM_RST_N,
+	 .sensor_pwd 	 = DESIREC_CAM_PWDN,
+	 /*.vcm_pwd        = DESIREC_GPIO_VCM_PWDN,*/
+	 .pdata          = &msm_camera_device_data,
+	 .resource = msm_camera_resources,
+	 .num_resources = ARRAY_SIZE(msm_camera_resources),
 };
 
 static struct platform_device msm_camera_sensor_s5k3e2fx = {
@@ -428,20 +461,266 @@ static struct platform_device msm_camera_sensor_s5k3e2fx = {
 	},
 };
 
-static void desirec_phy_reset(void)
+static int desirec_phy_init_seq[] = {0x40, 0x31, 0x1, 0x0D, 0x1, 0x10, -1};
+
+static void desirec_usb_phy_reset(void)
 {
-	printk("desirec_phy_reset\n");
+	printk("desirec_usb_phy_reset\n");
 	gpio_set_value(DESIREC_GPIO_USB_PHY_RST_N, 0);
 	mdelay(10);
 	gpio_set_value(DESIREC_GPIO_USB_PHY_RST_N, 1);
 	mdelay(10);
 }
 
-static void desirec_phy_shutdown(void)
-{
-	printk("desirec_phy_shutdown\n");
-	gpio_set_value(DESIREC_GPIO_USB_PHY_RST_N, 0);
-}
+static struct msm_hsusb_platform_data msm_hsusb_pdata = {
+	.phy_init_seq	= desirec_phy_init_seq,
+	.phy_reset		= desirec_usb_phy_reset,
+//	.hw_reset		= desirec_usb_hw_reset, TODO, check if neccesary?
+//	.usb_connected	= notify_usb_connected, TODO!
+};
+
+static char *usb_functions_ums[] = {
+	"usb_mass_storage",
+};
+
+static char *usb_functions_ums_adb[] = {
+	"usb_mass_storage",
+	"adb",
+};
+
+static char *usb_functions_rndis[] = {
+	"rndis",
+};
+
+static char *usb_functions_rndis_adb[] = {
+	"rndis",
+	"adb",
+};
+
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+static char *usb_functions_accessory[] = { "accessory" };
+static char *usb_functions_accessory_adb[] = { "accessory", "adb" };
+#endif
+
+#ifdef CONFIG_USB_ANDROID_DIAG
+static char *usb_functions_adb_diag[] = {
+	"usb_mass_storage",
+	"adb",
+	"diag",
+};
+#endif
+
+static char *usb_functions_all[] = {
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	"rndis",
+#endif
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	"accessory",
+#endif
+	"usb_mass_storage",
+	"adb",
+#ifdef CONFIG_USB_ANDROID_ACM
+	"acm",
+#endif
+#ifdef CONFIG_USB_ANDROID_DIAG
+	"diag",
+#endif
+};
+
+static struct android_usb_product usb_products[] = {
+	{
+		.product_id    = 0x0ff9, /* usb_mass_storage */
+		.num_functions = ARRAY_SIZE(usb_functions_ums),
+		.functions     = usb_functions_ums,
+	},
+	{
+		.product_id    = 0x0c99, /* usb_mass_storage + adb */
+		.num_functions = ARRAY_SIZE(usb_functions_ums_adb),
+		.functions     = usb_functions_ums_adb,
+	},
+	{
+		.product_id    = 0x0FFE, /* internet sharing */
+		.num_functions = ARRAY_SIZE(usb_functions_rndis),
+		.functions     = usb_functions_rndis,
+	},
+	/*
+	 * TODO: check whether this is working or not. Kinda a guess
+	 */
+	{
+		.product_id    = 0x0FFC,
+		.num_functions = ARRAY_SIZE(usb_functions_rndis_adb),
+		.functions     = usb_functions_rndis_adb,
+	},
+#ifdef CONFIG_USB_ANDROID_ACCESSORY
+	{
+		.vendor_id	= USB_ACCESSORY_VENDOR_ID,
+		.product_id	= USB_ACCESSORY_PRODUCT_ID,
+		.num_functions	= ARRAY_SIZE(usb_functions_accessory),
+		.functions	= usb_functions_accessory,
+	},
+	{
+		.vendor_id	= USB_ACCESSORY_VENDOR_ID,
+		.product_id	= USB_ACCESSORY_ADB_PRODUCT_ID,
+		.num_functions	= ARRAY_SIZE(usb_functions_accessory_adb),
+		.functions	= usb_functions_accessory_adb,
+	},
+#endif
+#ifdef CONFIG_USB_ANDROID_DIAG
+	{
+		.product_id    = 0x0c07,
+		.num_functions = ARRAY_SIZE(usb_functions_adb_diag),
+		.functions     = usb_functions_adb_diag,
+	},
+#endif
+};
+
+static struct usb_mass_storage_platform_data mass_storage_pdata = {
+	.nluns		= 1,
+	.vendor		= "HTC",
+	.product	= "Hero",
+	.release	= 0x0100,
+};
+
+static struct platform_device usb_mass_storage_device = {
+	.name = "usb_mass_storage",
+	.id   = -1,
+	.dev  = {
+		.platform_data = &mass_storage_pdata,
+	},
+};
+
+#ifdef CONFIG_USB_ANDROID_RNDIS
+static struct usb_ether_platform_data rndis_pdata = {
+	/* ethaddr is filled by board_serialno_setup */
+	.vendorID    = 0x0bb4,
+	.vendorDescr = "HTC",
+};
+
+static struct platform_device rndis_device = {
+	.name = "rndis",
+	.id   = -1,
+	.dev  = {
+		.platform_data = &rndis_pdata,
+	},
+};
+#endif
+
+static struct android_usb_platform_data android_usb_pdata = {
+	.vendor_id         = 0x0bb4,
+	.product_id        = 0x0c01,
+	.version           = 0x0100,
+	.product_name      = "Android Phone",
+	.manufacturer_name = "HTC",
+	.num_products      = ARRAY_SIZE(usb_products),
+	.products          = usb_products,
+	.num_functions     = ARRAY_SIZE(usb_functions_all),
+	.functions         = usb_functions_all,
+};
+
+static struct platform_device android_usb_device = {
+	.name = "android_usb",
+	.id   = -1,
+	.dev  = {
+		.platform_data = &android_usb_pdata,
+	},
+};
+
+static struct android_pmem_platform_data mdp_pmem_pdata = {
+	.name         = "pmem",
+	.start        = SMI32_MSM_PMEM_MDP_BASE,
+	.size         = SMI32_MSM_PMEM_MDP_SIZE,
+	.no_allocator = 0,
+	.cached       = 1,
+};
+
+static struct android_pmem_platform_data android_pmem_adsp_pdata = {
+	.name         = "pmem_adsp",
+	.start        = SMI32_MSM_PMEM_ADSP_BASE,
+	.size         = SMI32_MSM_PMEM_ADSP_SIZE,
+	.no_allocator = 0,
+	.cached       = 0,
+};
+
+static struct android_pmem_platform_data android_pmem_camera_pdata = {
+	.name         = "pmem_camera",
+	.start        = SMI32_MSM_PMEM_CAMERA_BASE,
+	.size         = SMI32_MSM_PMEM_CAMERA_SIZE,
+	.no_allocator = 1,
+	.cached       = 1,
+};
+
+static struct platform_device android_pmem_mdp_device = {
+	.name = "android_pmem",
+	.id   = 0,
+	.dev  = {
+		.platform_data = &mdp_pmem_pdata
+	},
+};
+
+static struct platform_device android_pmem_adsp_device = {
+	.name = "android_pmem",
+	.id   = 1,
+	.dev  = {
+		.platform_data = &android_pmem_adsp_pdata,
+	},
+};
+
+static struct platform_device android_pmem_camera_device = {
+	.name = "android_pmem",
+	.id   = 4,
+	.dev  = {
+		.platform_data = &android_pmem_camera_pdata
+	},
+};
+
+static struct resource resources_hw3d[] = {
+	{
+		.start	= 0xA0000000,
+		.end	= 0xA00fffff,
+		.flags	= IORESOURCE_MEM,
+		.name	= "regs",
+	},
+	{
+		.flags	= IORESOURCE_MEM,
+		.name	= "smi",
+		.start  = SMI32_MSM_PMEM_GPU0_BASE,
+		.end    = SMI32_MSM_PMEM_GPU0_BASE + SMI32_MSM_PMEM_GPU0_SIZE - 1,
+	},
+	{
+		.flags	= IORESOURCE_MEM,
+		.name	= "ebi",
+		.start  = SMI32_MSM_PMEM_GPU1_BASE,
+		.end    = SMI32_MSM_PMEM_GPU1_BASE + SMI32_MSM_PMEM_GPU1_SIZE - 1,
+	},
+	{
+		.start	= INT_GRAPHICS,
+		.end	= INT_GRAPHICS,
+		.flags	= IORESOURCE_IRQ,
+		.name	= "gfx",
+	},
+};
+
+static struct platform_device hw3d_device = {
+	.name          = "msm_hw3d",
+	.id            = 0,
+	.num_resources = ARRAY_SIZE(resources_hw3d),
+	.resource      = resources_hw3d,
+};
+
+static struct resource ram_console_resources[] = {
+	{
+		.start = SMI32_MSM_RAM_CONSOLE_BASE,
+		.end   = SMI32_MSM_RAM_CONSOLE_BASE + SMI32_MSM_RAM_CONSOLE_SIZE - 1,
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device ram_console_device = {
+	.name          = "ram_console",
+	.id            = -1,
+	.num_resources = ARRAY_SIZE(ram_console_resources),
+	.resource      = ram_console_resources,
+};
 
 static struct pwr_sink desirec_pwrsink_table[] = {
 	{
@@ -499,8 +778,7 @@ static int desirec_pwrsink_resume_early(struct platform_device *pdev)
 
 static void desirec_pwrsink_resume_late(struct early_suspend *h)
 {
-	printk(KERN_INFO "desirec_pwrsink_resume_late\n");
-	gpio_direction_output(DESIREC_GPIO_TP_EN, 1); /* for melfas workarround*/
+	gpio_direction_output(DESIREC_GPIO_TP_EN, 1); /* for melfas workaround*/
 	htc_pwrsink_set(PWRSINK_SYSTEM_LOAD, 38);
 }
 
@@ -542,21 +820,17 @@ static uint32_t uart3_on_gpio_table[] = {
 /* default TX,RX to GPI */
 static uint32_t uart3_off_gpi_table[] = {
 	/* RX, H2W DATA */
-	PCOM_GPIO_CFG(DESIREC_GPIO_H2W_DATA, 0,
-		      GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_H2W_DATA, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
 	/* TX, H2W CLK */
-	PCOM_GPIO_CFG(DESIREC_GPIO_H2W_CLK, 0,
-		      GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_H2W_CLK, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_2MA),
 };
 
 /* set TX,RX to GPO */
 static uint32_t uart3_off_gpo_table[] = {
 	/* RX, H2W DATA */
-	PCOM_GPIO_CFG(DESIREC_GPIO_H2W_DATA, 0,
-		      GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_H2W_DATA, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
 	/* TX, H2W CLK */
-	PCOM_GPIO_CFG(DESIREC_GPIO_H2W_CLK, 0,
-		      GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_H2W_CLK, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_2MA),
 };
 
 static int desirec_h2w_path = H2W_GPIO;
@@ -566,18 +840,14 @@ static void h2w_configure(int route)
 	printk(KERN_INFO "H2W route = %d \n", route);
 	switch (route) {
 	case H2W_UART3:
-		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX,
-			      uart3_on_gpio_table+0, 0);
-		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX,
-			      uart3_on_gpio_table+1, 0);
+		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, uart3_on_gpio_table + 0, 0);
+		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, uart3_on_gpio_table + 1, 0);
 		desirec_h2w_path = H2W_UART3;
 		printk(KERN_INFO "H2W -> UART3\n");
 		break;
 	case H2W_GPIO:
-		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX,
-			      uart3_off_gpi_table+0, 0);
-		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX,
-			      uart3_off_gpi_table+1, 0);
+		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, uart3_off_gpi_table + 0, 0);
+		msm_proc_comm(PCOM_RPC_GPIO_TLMM_CONFIG_EX, uart3_off_gpi_table + 1, 0);
 		desirec_h2w_path = H2W_GPIO;
 		printk(KERN_INFO "H2W -> GPIO\n");
 		break;
@@ -601,7 +871,7 @@ static void set_h2w_clk(int n)
 
 static void set_h2w_dat_dir(int n)
 {
-#if 0
+#if (0)
 	if (n == 0) /* input */
 		gpio_direction_input(DESIREC_GPIO_H2W_DATA);
 	else
@@ -618,7 +888,7 @@ static void set_h2w_dat_dir(int n)
 
 static void set_h2w_clk_dir(int n)
 {
-#if 0
+#if (0)
 	if (n == 0) /* input */
 		gpio_direction_input(DESIREC_GPIO_H2W_CLK);
 	else
@@ -643,7 +913,6 @@ static int get_h2w_clk(void)
 	return gpio_get_value(DESIREC_GPIO_H2W_CLK);
 }
 
-#ifdef CONFIG_HTC_HEADSET_V1
 static int set_h2w_path(const char *val, struct kernel_param *kp)
 {
 	int ret = -EINVAL;
@@ -671,46 +940,110 @@ static int set_h2w_path(const char *val, struct kernel_param *kp)
 	return ret;
 }
 
+static void desirec_h2w_power(int on)
+{
+	if (on)
+		gpio_set_value(DESIREC_GPIO_H2W_POWER, 1);
+	else
+		gpio_set_value(DESIREC_GPIO_H2W_POWER, 0);
+}
+
 module_param_call(h2w_path, set_h2w_path, param_get_int,
 		&desirec_h2w_path, S_IWUSR | S_IRUGO);
 
-#endif
 static struct h2w_platform_data desirec_h2w_data = {
-	.h2w_power		= DESIREC_GPIO_H2W_POWER,
-	.cable_in1		= DESIREC_GPIO_CABLE_IN1,
-	.cable_in2		= DESIREC_GPIO_CABLE_IN2,
-	.h2w_clk		= DESIREC_GPIO_H2W_CLK,
-	.h2w_data		= DESIREC_GPIO_H2W_DATA,
-	.ext_mic_sel		= DESIREC_GPIO_AUD_EXTMIC_SEL,
+	.h2w_power	 	= DESIREC_GPIO_H2W_POWER,
+	.cable_in1	 	= DESIREC_GPIO_CABLE_IN1,
+	.cable_in2	 	= DESIREC_GPIO_CABLE_IN2,
+	.h2w_clk 		= DESIREC_GPIO_H2W_CLK,
+	.h2w_data 		= DESIREC_GPIO_H2W_DATA,
+	.headset_mic_35mm 	= DESIREC_GPIO_HEADSET_MIC,
+	.ext_mic_sel 		= DESIREC_GPIO_AUD_EXTMIC_SEL,
 	.debug_uart 		= H2W_UART3,
 	.config 		= h2w_configure,
 	.defconfig 		= h2w_defconfig,
-	.set_dat		= set_h2w_dat,
-	.set_clk		= set_h2w_clk,
-	.set_dat_dir		= set_h2w_dat_dir,
-	.set_clk_dir		= set_h2w_clk_dir,
-	.get_dat		= get_h2w_dat,
-	.get_clk		= get_h2w_clk,
+	.set_dat 		= set_h2w_dat,
+	.set_clk 		= set_h2w_clk,
+	.set_dat_dir 		= set_h2w_dat_dir,
+	.set_clk_dir 		= set_h2w_clk_dir,
+	.get_dat 		= get_h2w_dat,
+	.get_clk 		= get_h2w_clk,
+	.flags 			= REVERSE_MIC_SEL | _35MM_MIC_DET_L2H | HTC_11PIN_HEADSET_SUPPORT | HTC_H2W_SUPPORT,
 };
 
 static struct platform_device desirec_h2w = {
-	.name		= "htc_headset",
-	.id			= -1,
-	.dev		= {
-		.platform_data	= &desirec_h2w_data,
+	.name 	= "h2w",
+	.id 	= -1,
+	.dev 	= {
+		.platform_data = &desirec_h2w_data,
 	},
 };
 
+#if 0
 static struct audio_jack_platform_data desirec_jack_data = {
-	.gpio	= DESIREC_GPIO_35MM_HEADSET_DET,
+    .gpio = DESIREC_GPIO_35MM_HEADSET_DET,
 };
 
 static struct platform_device desirec_audio_jack = {
-	.name		= "audio-jack",
-	.id			= -1,
-	.dev		= {
-		.platform_data	= &desirec_jack_data,
+    .name = "audio-jack",
+    .id = -1,
+    .dev = {
+    .platform_data = &desirec_jack_data,
+    },
+};
+#endif
+
+/* HTC_HEADSET_GPIO Driver */
+static struct htc_headset_gpio_platform_data htc_headset_gpio_data = {
+    .hpin_gpio      = DESIREC_GPIO_35MM_HEADSET_DET,
+    .key_enable_gpio    = 0,
+    .mic_select_gpio    = 0,
+};
+
+static struct platform_device htc_headset_gpio = {
+    .name   = "HTC_HEADSET_GPIO",
+    .id = -1,
+    .dev    = {
+        .platform_data = &htc_headset_gpio_data,
+    },
+};
+
+/* HTC_HEADSET_MICROP Driver */
+static struct htc_headset_microp_platform_data htc_headset_microp_data = {
+	.remote_int		= 1 << 5,
+	.remote_irq		= MSM_uP_TO_INT(5),
+	.remote_enable_pin	= 0,
+	.adc_channel		= 0x01,
+	.adc_remote		= {0, 33, 38, 82, 95, 167},
+};
+
+static struct platform_device htc_headset_microp = {
+	.name	= "HTC_HEADSET_MICROP",
+	.id	= -1,
+	.dev	= {
+		.platform_data = &htc_headset_microp_data,
 	},
+};
+
+/* HTC_HEADSET_MGR Driver */
+static struct platform_device *headset_devices[] = {
+    &desirec_h2w,
+	&htc_headset_microp,
+	&htc_headset_gpio,
+	/* Please put the headset detection driver on the last */
+};
+
+static struct htc_headset_mgr_platform_data htc_headset_mgr_data = {
+	.headset_devices_num	= ARRAY_SIZE(headset_devices),
+	.headset_devices	= headset_devices,
+};
+
+static struct platform_device desirec_headset_mgr = {
+    .name   = "HTC_HEADSET_MGR",
+    .id = -1,
+    .dev    = {
+        .platform_data = &htc_headset_mgr_data,
+    },
 };
 
 static struct platform_device desirec_rfkill = {
@@ -718,7 +1051,68 @@ static struct platform_device desirec_rfkill = {
 	.id = -1,
 };
 
-/* Proximity Sensor (Capella_CM3502)*/
+#define SND(num, desc) { .name = desc, .id = num }
+static struct snd_endpoint snd_endpoints_list[] = {
+	SND(0, "HANDSET"),
+	SND(1, "SPEAKER"),
+	SND(2, "HEADSET"),
+	SND(3, "BT"),
+	SND(44, "BT_EC_OFF"),
+	SND(10, "HEADSET_AND_SPEAKER"),
+	SND(256, "CURRENT"),
+
+	/* Bluetooth accessories. */
+
+	SND(12, "HTC BH S100"),
+	SND(13, "HTC BH M100"),
+	SND(14, "Motorola H500"),
+	SND(15, "Nokia HS-36W"),
+	SND(16, "PLT 510v.D"),
+	SND(17, "M2500 by Plantronics"),
+	SND(18, "Nokia HDW-3"),
+	SND(19, "HBH-608"),
+	SND(20, "HBH-DS970"),
+	SND(21, "i.Tech BlueBAND"),
+	SND(22, "Nokia BH-800"),
+	SND(23, "Motorola H700"),
+	SND(24, "HTC BH M200"),
+	SND(25, "Jabra JX10"),
+	SND(26, "320Plantronics"),
+	SND(27, "640Plantronics"),
+	SND(28, "Jabra BT500"),
+	SND(29, "Motorola HT820"),
+	SND(30, "HBH-IV840"),
+	SND(31, "6XXPlantronics"),
+	SND(32, "3XXPlantronics"),
+	SND(33, "HBH-PV710"),
+	SND(34, "Motorola H670"),
+	SND(35, "HBM-300"),
+	SND(36, "Nokia BH-208"),
+	SND(37, "Samsung WEP410"),
+	SND(38, "Jabra BT8010"),
+	SND(39, "Motorola S9"),
+	SND(40, "Jabra BT620s"),
+	SND(41, "Nokia BH-902"),
+	SND(42, "HBH-DS220"),
+	SND(43, "HBH-DS980"),
+};
+#undef SND
+
+static struct msm_snd_endpoints hero_snd_endpoints = {
+	.endpoints = snd_endpoints_list,
+	.num = ARRAY_SIZE(snd_endpoints_list),
+};
+
+static struct platform_device hero_snd = {
+	.name = "msm_snd",
+	.id = -1,
+	.dev	= {
+		.platform_data = &hero_snd_endpoints,
+	},
+};
+
+
+/* Proximity Sensor (Capella_CM3602)*/
 static int __capella_cm3602_power(int on)
 {
 	int rc;
@@ -779,95 +1173,45 @@ static struct platform_device capella_cm3602 = {
 };
 /* End Proximity Sensor (Capella_CM3502)*/
 
-static struct msm_pmem_setting pmem_dual_die_setting = {
-	.pmem_start = MSM_PMEM_MDP_BASE,
-	.pmem_size = MSM_PMEM_MDP_SIZE,
-	.pmem_adsp_start = MSM_PMEM_ADSP_BASE,
-	.pmem_adsp_size = MSM_PMEM_ADSP_SIZE,
-	.pmem_gpu0_start = MSM_PMEM_GPU0_BASE,
-	.pmem_gpu0_size = MSM_PMEM_GPU0_SIZE,
-	.pmem_gpu1_start = MSM_PMEM_GPU1_BASE,
-	.pmem_gpu1_size = MSM_PMEM_GPU1_SIZE,
-	.pmem_camera_start = MSM_PMEM_CAMERA_BASE,
-	.pmem_camera_size = MSM_PMEM_CAMERA_SIZE,
-	.ram_console_start = MSM_RAM_CONSOLE_BASE,
-	.ram_console_size = MSM_RAM_CONSOLE_SIZE,
-#ifdef CONFIG_BUILD_CIQ
-	.pmem_ciq_start = MSM_PMEM_CIQ_BASE,
-	.pmem_ciq_size = MSM_PMEM_CIQ_SIZE,
-	.pmem_ciq1_start = MSM_PMEM_CIQ1_BASE,
-	.pmem_ciq1_size = MSM_PMEM_CIQ1_SIZE,
-	.pmem_ciq2_start = MSM_PMEM_CIQ2_BASE,
-	.pmem_ciq2_size = MSM_PMEM_CIQ2_SIZE,
-	.pmem_ciq3_start = MSM_PMEM_CIQ3_BASE,
-	.pmem_ciq3_size = MSM_PMEM_CIQ3_SIZE,
-/*
-	.pmem_ciq4_start = MSM_PMEM_CIQ4_BASE,
-	.pmem_ciq4_size = MSM_PMEM_CIQ4_SIZE,
-*/
-#endif
-};
-
-#define MONO_DIE_PMEM_SHIFT  0x8000000
-
-static struct msm_pmem_setting pmem_mono_die_setting = {
-	.pmem_start = MSM_PMEM_MDP_BASE - MONO_DIE_PMEM_SHIFT,
-	.pmem_size = MSM_PMEM_MDP_SIZE,
-	.pmem_adsp_start = MSM_PMEM_ADSP_BASE - MONO_DIE_PMEM_SHIFT,
-	.pmem_adsp_size = MSM_PMEM_ADSP_SIZE,
-	.pmem_gpu0_start = MSM_PMEM_GPU0_BASE,
-	.pmem_gpu0_size = MSM_PMEM_GPU0_SIZE,
-	.pmem_gpu1_start = MSM_PMEM_GPU1_BASE - MONO_DIE_PMEM_SHIFT,
-	.pmem_gpu1_size = MSM_PMEM_GPU1_SIZE,
-	.pmem_camera_start = MSM_PMEM_CAMERA_BASE - MONO_DIE_PMEM_SHIFT,
-	.pmem_camera_size = MSM_PMEM_CAMERA_SIZE,
-	.ram_console_start = MSM_RAM_CONSOLE_BASE,
-	.ram_console_size = MSM_RAM_CONSOLE_SIZE,
-#ifdef CONFIG_BUILD_CIQ
-	.pmem_ciq_start = MSM_PMEM_CIQ_BASE,
-	.pmem_ciq_size = MSM_PMEM_CIQ_SIZE,
-	.pmem_ciq1_start = MSM_PMEM_CIQ1_BASE,
-	.pmem_ciq1_size = MSM_PMEM_CIQ1_SIZE,
-	.pmem_ciq2_start = MSM_PMEM_CIQ2_BASE,
-	.pmem_ciq2_size = MSM_PMEM_CIQ2_SIZE,
-	.pmem_ciq3_start = MSM_PMEM_CIQ3_BASE,
-	.pmem_ciq3_size = MSM_PMEM_CIQ3_SIZE,
-/*
-	.pmem_ciq4_start = MSM_PMEM_CIQ4_BASE,
-	.pmem_ciq4_size = MSM_PMEM_CIQ4_SIZE,
-*/
-#endif
-};
 
 static struct msm_i2c_device_platform_data desirec_i2c_device_data = {
-	.i2c_clock = 100000,
-	.clock_strength = GPIO_8MA,
-	.data_strength = GPIO_4MA,
+        .i2c_clock = 100000,
+        .clock_strength = GPIO_8MA,
+        .data_strength = GPIO_4MA,
 };
 
 static struct platform_device *devices[] __initdata = {
+	&msm_device_smd,
+	&msm_device_nand,
 	&msm_device_i2c,
-	&desirec_h2w,
+#ifdef CONFIG_SERIAL_MSM_HS
+	&msm_device_uart_dm1,
+#else
+	&msm_device_uart1,
+#endif
+	&msm_device_uart3,
+	&msm_camera_sensor_s5k3e2fx,
 	&htc_battery_pdev,
-	&desirec_audio_jack,
 	&desirec_rfkill,
+	&desirec_headset_mgr,
+//	&desirec_h2w,
+//	&desirec_audio_jack,
 #ifdef CONFIG_HTC_PWRSINK
 	&desirec_pwr_sink,
 #endif
+	&hero_snd,
+	&msm_device_hsusb,
+	&usb_mass_storage_device,
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	&rndis_device,
+#endif
+	&android_usb_device,
+	&android_pmem_mdp_device,
+	&android_pmem_adsp_device,
+	&android_pmem_camera_device,
+	&hw3d_device,
+	&ram_console_device,
 	&capella_cm3602,
-	&msm_camera_sensor_s5k3e2fx
-};
-
-static struct platform_device *devices0[] __initdata = {
-	&msm_device_i2c,
-	&desirec_h2w,
-	&htc_battery_pdev,
-	&desirec_audio_jack,
-	&desirec_rfkill,
-#ifdef CONFIG_HTC_PWRSINK
-	&desirec_pwr_sink,
-#endif
-	&msm_camera_sensor_s5k3e2fx
 };
 
 extern struct sys_timer msm_timer;
@@ -878,14 +1222,18 @@ static void __init desirec_init_irq(void)
 	msm_init_irq();
 }
 
+static uint cpld_iset;
+static uint cpld_charger_en;
 static uint opt_disable_uart3;
 
+module_param_named(iset, cpld_iset, uint, 0);
+module_param_named(charger_en, cpld_charger_en, uint, 0);
 module_param_named(disable_uart3, opt_disable_uart3, uint, 0);
 
 static void clear_bluetooth_rx_irq_status(void)
 {
-	#define GPIO_INT_CLEAR_2 (MSM_GPIO1_BASE + 0x800 + 0x94)
-	writel((1U << (DESIREC_GPIO_UART1_RX-43)), GPIO_INT_CLEAR_2);
+        #define GPIO_INT_CLEAR_2 (MSM_GPIO1_BASE + 0x800 + 0x94)
+        writel((1U << (DESIREC_GPIO_UART1_RX-43)), GPIO_INT_CLEAR_2);
 }
 
 static char bt_chip_id[10] = "brfxxxx";
@@ -902,100 +1250,97 @@ static void desirec_reset(void)
 }
 
 static uint32_t gpio_table[] = {
-	/* I2C */
-	PCOM_GPIO_CFG(DESIREC_GPIO_I2C_CLK, 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),
-	PCOM_GPIO_CFG(DESIREC_GPIO_I2C_DAT , 1, GPIO_INPUT, GPIO_NO_PULL, GPIO_4MA),
 };
 
 
 static uint32_t camera_off_gpio_table[] = {
 	/* CAMERA */
-	PCOM_GPIO_CFG(0, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT0 */
-	PCOM_GPIO_CFG(1, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT1 */
-	PCOM_GPIO_CFG(2, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT2 */
-	PCOM_GPIO_CFG(3, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT3 */
-	PCOM_GPIO_CFG(4, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT4 */
-	PCOM_GPIO_CFG(5, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT5 */
-	PCOM_GPIO_CFG(6, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT6 */
-	PCOM_GPIO_CFG(7, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT7 */
-	PCOM_GPIO_CFG(8, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT8 */
-	PCOM_GPIO_CFG(9, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT9 */
-	PCOM_GPIO_CFG(10, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT10 */
-	PCOM_GPIO_CFG(11, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT11 */
-	PCOM_GPIO_CFG(12, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* PCLK */
-	PCOM_GPIO_CFG(13, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* HSYNC_IN */
-	PCOM_GPIO_CFG(14, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* VSYNC_IN */
+	PCOM_GPIO_CFG(0, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT0 */
+	PCOM_GPIO_CFG(1, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT1 */
+	PCOM_GPIO_CFG(2, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT2 */
+	PCOM_GPIO_CFG(3, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT3 */
+	PCOM_GPIO_CFG(4, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT4 */
+	PCOM_GPIO_CFG(5, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT5 */
+	PCOM_GPIO_CFG(6, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT6 */
+	PCOM_GPIO_CFG(7, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT7 */
+	PCOM_GPIO_CFG(8, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT8 */
+	PCOM_GPIO_CFG(9, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT9 */
+	PCOM_GPIO_CFG(10, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT10 */
+	PCOM_GPIO_CFG(11, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* DAT11 */
+	PCOM_GPIO_CFG(12, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* PCLK */
+	PCOM_GPIO_CFG(13, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* HSYNC */
+	PCOM_GPIO_CFG(14, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_4MA), /* VSYNC */
 	PCOM_GPIO_CFG(15, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* MCLK */
 };
 
 static uint32_t camera_on_gpio_table[] = {
 	/* CAMERA */
-	PCOM_GPIO_CFG(0, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT0 */
-	PCOM_GPIO_CFG(1, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT1 */
-	PCOM_GPIO_CFG(2, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT2 */
-	PCOM_GPIO_CFG(3, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT3 */
-	PCOM_GPIO_CFG(4, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT4 */
-	PCOM_GPIO_CFG(5, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT5 */
-	PCOM_GPIO_CFG(6, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT6 */
-	PCOM_GPIO_CFG(7, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT7 */
-	PCOM_GPIO_CFG(8, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT8 */
-	PCOM_GPIO_CFG(9, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT9 */
-	PCOM_GPIO_CFG(10, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT10 */
-	PCOM_GPIO_CFG(11, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* DAT11 */
-	PCOM_GPIO_CFG(12, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_16MA), /* PCLK */
-	PCOM_GPIO_CFG(13, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* HSYNC_IN */
-	PCOM_GPIO_CFG(14, 1, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA), /* VSYNC_IN */
-/*	PCOM_GPIO_CFG(15, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_16MA),*/ /* MCLK */
+	PCOM_GPIO_CFG(0, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT0 */
+	PCOM_GPIO_CFG(1, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT1 */
+	PCOM_GPIO_CFG(2, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT2 */
+	PCOM_GPIO_CFG(3, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT3 */
+	PCOM_GPIO_CFG(4, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT4 */
+	PCOM_GPIO_CFG(5, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT5 */
+	PCOM_GPIO_CFG(6, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT6 */
+	PCOM_GPIO_CFG(7, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT7 */
+	PCOM_GPIO_CFG(8, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT8 */
+	PCOM_GPIO_CFG(9, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT9 */
+	PCOM_GPIO_CFG(10, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT10 */
+	PCOM_GPIO_CFG(11, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* DAT11 */
+	PCOM_GPIO_CFG(12, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_16MA), /* PCLK */
+	PCOM_GPIO_CFG(13, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* HSYNC */
+	PCOM_GPIO_CFG(14, 1, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA), /* VSYNC */
 	PCOM_GPIO_CFG(15, 1, GPIO_OUTPUT, GPIO_PULL_UP, GPIO_8MA), /* MCLK */
-	/*steven yeh: modify MCLK driving strength to avoid overshot issue*/
 };
 
 void config_desirec_camera_on_gpios(void)
 {
-	config_gpio_table(camera_on_gpio_table,
-		ARRAY_SIZE(camera_on_gpio_table));
+        config_gpio_table(camera_on_gpio_table,
+                ARRAY_SIZE(camera_on_gpio_table));
 }
 
 void config_desirec_camera_off_gpios(void)
 {
-	config_gpio_table(camera_off_gpio_table,
-		ARRAY_SIZE(camera_off_gpio_table));
+        config_gpio_table(camera_off_gpio_table,
+                ARRAY_SIZE(camera_off_gpio_table));
 }
 
 static void __init config_gpios(void)
 {
 	config_gpio_table(gpio_table, ARRAY_SIZE(gpio_table));
+	config_desirec_camera_off_gpios();
 }
 
 static struct msm_acpu_clock_platform_data desirec_clock_data = {
 	.acpu_switch_time_us = 20,
 	.max_speed_delta_khz = 256000,
 	.vdd_switch_time_us = 62,
-	.power_collapse_khz = 19200000,
+	.power_collapse_khz = 19200,
 #if defined(CONFIG_TURBO_MODE)
-	.wait_for_irq_khz = 176000000,
+	.wait_for_irq_khz = 176000,
 #else
-	.wait_for_irq_khz = 128000000,
+	.wait_for_irq_khz = 128000,
 #endif
 };
 
+#ifdef CONFIG_PERFLOCK
 static unsigned desirec_perf_acpu_table[] = {
-	245760000,
-	480000000,
-	528000000,
+        264000000,
+        480000000,
+        518400000,
 };
 
 static struct perflock_platform_data desirec_perflock_data = {
 	.perf_acpu_table = desirec_perf_acpu_table,
 	.table_size = ARRAY_SIZE(desirec_perf_acpu_table),
 };
+#endif
 
 #ifdef CONFIG_SERIAL_MSM_HS
 static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
-	.wakeup_irq = MSM_GPIO_TO_INT(DESIREC_GPIO_UART1_RX),
+	.rx_wakeup_irq = MSM_GPIO_TO_INT(DESIREC_GPIO_UART1_RX),
 	.inject_rx_on_wakeup = 1,
 	.rx_to_inject = 0x32,
-	.cpu_lock_supported = 1,
 };
 #endif
 
@@ -1052,8 +1397,8 @@ static struct attribute_group desirec_properties_attr_group = {
 static void __init desirec_init(void)
 {
 	int rc;
+	printk(KERN_INFO "desirec_init() revision=%d\n", system_rev);
 	struct kobject *properties_kobj;
-	printk(KERN_INFO "%s() revision = %d\n", __func__, system_rev);
 
 	config_gpios();
 
@@ -1067,10 +1412,17 @@ static void __init desirec_init(void)
 		__capella_cm3602_power(0);
 	}
 
+//	gpio_request(DESIREC_GPIO_H2W_POWER, "desirec_gpio_h2w_power");
+//	gpio_request(DESIREC_GPIO_CABLE_IN2, "desirec_gpio_cable_in2");
+	gpio_request(DESIREC_GPIO_AUD_EXTMIC_SEL, "desirec_gpio_aud_extmic_sel");
+
 	msm_hw_reset_hook = desirec_reset;
 
 	msm_acpu_clock_init(&desirec_clock_data);
+
+#ifdef CONFIG_PERFLOCK
 	perflock_init(&desirec_perflock_data);
+#endif
 
 #if defined(CONFIG_MSM_SERIAL_DEBUGGER)
 	if (!opt_disable_uart3)
@@ -1078,27 +1430,13 @@ static void __init desirec_init(void)
 				      &msm_device_uart3.dev, 1, INT_UART3_RX);
 #endif
 
-	msm_add_devices();
-
-	clear_bluetooth_rx_irq_status();
-
 #ifdef CONFIG_SERIAL_MSM_HS
 	msm_device_uart_dm1.dev.platform_data = &msm_uart_dm1_pdata;
-	msm_add_serial_devices(MSM_SERIAL_UART1DM);
-#else
-	msm_add_serial_devices(MSM_SERIAL_UART1);
 #endif
 
-	msm_add_serial_devices(MSM_SERIAL_UART3);
+	msm_device_hsusb.dev.platform_data = &msm_hsusb_pdata;
 
-	msm_add_usb_devices(desirec_phy_reset, desirec_phy_shutdown);
-
-	if (board_mcp_monodie())
-		msm_add_mem_devices(&pmem_mono_die_setting);
-	else
-		msm_add_mem_devices(&pmem_dual_die_setting);
-
-	msm_init_pmic_vibrator();
+	msm_init_pmic_vibrator(3000);
 
 	rc = desirec_init_mmc(system_rev);
 	if (rc)
@@ -1111,12 +1449,8 @@ static void __init desirec_init(void)
 	if (!properties_kobj || rc)
 		pr_err("failed to create board_properties\n");
 
+	msm_i2c_gpio_init();
 	msm_device_i2c.dev.platform_data = &desirec_i2c_device_data;
-
-	if (system_rev > 0) /*Aobve XB*/
-		platform_add_devices(devices, ARRAY_SIZE(devices));
-	else /* XA */
-		platform_add_devices(devices0, ARRAY_SIZE(devices0));
 
 	if (system_rev > 0) {
 		microp_data.ls_power = capella_cm3602_power;
@@ -1127,7 +1461,11 @@ static void __init desirec_init(void)
 	}
 
 	i2c_register_board_info(0, i2c_devices, ARRAY_SIZE(i2c_devices));
-/* r porting*///	i2c_register_board_info(0, &i2c_s5k3e2fx, 1);
+	platform_add_devices(devices, ARRAY_SIZE(devices));
+
+	clear_bluetooth_rx_irq_status();
+
+//	desirec_init_panel();
 }
 
 static void __init desirec_fixup(struct machine_desc *desc, struct tag *tags,
@@ -1136,16 +1474,16 @@ static void __init desirec_fixup(struct machine_desc *desc, struct tag *tags,
 	parse_tag_monodie((const struct tag *)tags);
 
 	mi->nr_banks = 1;
-	mi->bank[0].start = MSM_LINUX_BASE1;
-	mi->bank[0].node = PHYS_TO_NID(MSM_LINUX_BASE1);
+	mi->bank[0].start = PHYS_OFFSET;
+	mi->bank[0].node = PHYS_TO_NID(PHYS_OFFSET);
 	if (board_mcp_monodie()) {
-		mi->bank[0].size = MSM_LINUX_SIZE1 + MSM_LINUX_SIZE2;
+		mi->bank[0].size = MSM_EBI_SIZE1 + MSM_EBI_SIZE2;
 	} else {
 		mi->nr_banks = 2;
-		mi->bank[0].size = MSM_LINUX_SIZE1;
-		mi->bank[1].start = MSM_LINUX_BASE2;
-		mi->bank[1].node = PHYS_TO_NID(MSM_LINUX_BASE2);
-		mi->bank[1].size = MSM_LINUX_SIZE2;
+		mi->bank[0].size = MSM_EBI_SIZE1;
+		mi->bank[1].start = MSM_EBI_BASE2;
+		mi->bank[1].node = PHYS_TO_NID(MSM_EBI_BASE2);
+		mi->bank[1].size = MSM_EBI_SIZE2;
 	}
 }
 
@@ -1161,7 +1499,7 @@ MACHINE_START(DESIREC, "desirec")
 	.phys_io        = MSM_DEBUG_UART_PHYS,
 	.io_pg_offst    = ((MSM_DEBUG_UART_BASE) >> 18) & 0xfffc,
 #endif
-	.boot_params    = 0x11200100,
+	.boot_params    = MSM_EBI_BASE1 + 0x100,
 	.fixup          = desirec_fixup,
 	.map_io         = desirec_map_io,
 	.init_irq       = desirec_init_irq,

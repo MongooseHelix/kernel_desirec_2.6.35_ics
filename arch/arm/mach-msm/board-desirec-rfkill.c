@@ -1,4 +1,4 @@
-/*
+/* linux/arch/arm/mach-msm/board-desirec-rfkill.c
  * Copyright (C) 2009 Google, Inc.
  * Copyright (C) 2009 HTC Corporation.
  *
@@ -10,8 +10,7 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
-*/
+ */
 
 /* Control bluetooth power for desirec platform */
 
@@ -20,9 +19,9 @@
 #include <linux/device.h>
 #include <linux/rfkill.h>
 #include <linux/delay.h>
-#include <asm/gpio.h>
+#include <linux/gpio.h>
 #include <asm/mach-types.h>
-
+#include "gpio_chip.h"
 #include "proc_comm.h"
 #include "board-desirec.h"
 
@@ -33,45 +32,53 @@ static const char bt_name[] = "brf6350";
 
 static int desirec_bt_status;
 
+/*
+ * Info on the following tables:
+ * - DESIREC_GPIO_UART1 corresponds to the bluetooth device
+ * - With DESIREC_GPIO_WB_SHUT_DOWN_N we can control the power-mode
+ */
 static uint32_t desirec_bt_init_table[] = {
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RTS, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_RTS */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_CTS, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_CTS */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RX, 0, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),		/* BT_RX */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_TX, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_TX */
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RTS, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_CTS, 0, GPIO_INPUT,  GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RX,  0, GPIO_INPUT,  GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_TX,  0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 	
-	PCOM_GPIO_CFG(DESIREC_GPIO_WB_SHUT_DOWN_N, 0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_8MA),		/* BT_ENABLE */
+	PCOM_GPIO_CFG(DESIREC_GPIO_WB_SHUT_DOWN_N, 0, GPIO_OUTPUT, GPIO_PULL_DOWN,
+			GPIO_8MA),
 };
 
 static uint32_t desirec_bt_on_table[] = {
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RTS, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_RTS */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_CTS, 2, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_CTS */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RX, 2, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),		/* BT_RX */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_TX, 3, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_TX */
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RTS, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_CTS, 2, GPIO_INPUT,  GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RX,  2, GPIO_INPUT,  GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_TX,  3, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 	
-	PCOM_GPIO_CFG(DESIREC_GPIO_WB_SHUT_DOWN_N, 0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_8MA),		/* BT_ENABLE */
+	PCOM_GPIO_CFG(DESIREC_GPIO_WB_SHUT_DOWN_N, 0, GPIO_OUTPUT, GPIO_PULL_DOWN,
+			GPIO_8MA),
 };
 
 static uint32_t desirec_bt_off_table[] = {
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RTS, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_RTS */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_CTS, 2, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_CTS */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RX, 2, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),		/* BT_RX */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_TX, 3, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_TX */
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RTS, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_CTS, 2, GPIO_INPUT,  GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RX,  2, GPIO_INPUT,  GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_TX,  3, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 	
-	PCOM_GPIO_CFG(DESIREC_GPIO_WB_SHUT_DOWN_N, 0, GPIO_OUTPUT, GPIO_PULL_DOWN, GPIO_8MA),		/* BT_ENABLE */
+	PCOM_GPIO_CFG(DESIREC_GPIO_WB_SHUT_DOWN_N, 0, GPIO_OUTPUT, GPIO_PULL_DOWN,
+			GPIO_8MA),
 };
 
 static uint32_t desirec_bt_disable_active_table[] = {
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RTS, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_RTS */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_CTS, 2, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_CTS */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RX, 2, GPIO_INPUT, GPIO_NO_PULL, GPIO_8MA),		/* BT_RX */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_TX, 3, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),	/* BT_TX */
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RTS, 2, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_CTS, 2, GPIO_INPUT,  GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RX,  2, GPIO_INPUT,  GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_TX,  3, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 };
 
 static uint32_t desirec_bt_disable_sleep_table[] = {
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RTS, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),	/* O(L) */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_CTS, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_8MA),	/* I(PU) */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RX, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_8MA),		/* I(PU) */
-	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_TX, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),	/* O(H) */
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RTS, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_CTS, 0, GPIO_INPUT,  GPIO_PULL_UP, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_RX,  0, GPIO_INPUT,  GPIO_PULL_UP, GPIO_8MA),
+	PCOM_GPIO_CFG(DESIREC_GPIO_UART1_TX,  0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_8MA),
 };
 
 static void config_bt_table(uint32_t *table, int len)
@@ -130,8 +137,8 @@ void desirec_config_bt_disable_sleep(void)
 {
 	config_bt_table(desirec_bt_disable_sleep_table, ARRAY_SIZE(desirec_bt_disable_sleep_table));
 	mdelay(5);
-	gpio_configure(DESIREC_GPIO_UART1_RTS, GPIOF_DRIVE_OUTPUT | GPIOF_OUTPUT_LOW);	/* O(L) */
-	gpio_configure(DESIREC_GPIO_UART1_TX, GPIOF_DRIVE_OUTPUT | GPIOF_OUTPUT_HIGH);	/* O(H) */
+	gpio_configure(DESIREC_GPIO_UART1_RTS, GPIOF_DRIVE_OUTPUT | GPIOF_OUTPUT_LOW);
+	gpio_configure(DESIREC_GPIO_UART1_TX, GPIOF_DRIVE_OUTPUT | GPIOF_OUTPUT_HIGH);
 }
 
 int desirec_is_bluetooth_off(void)
@@ -139,54 +146,48 @@ int desirec_is_bluetooth_off(void)
 	return !desirec_bt_status;	//ON:1, OFF:0
 }
 
-static int bluetooth_set_power(void *data, enum rfkill_state state)
+static int bluetooth_set_power(void *data, bool blocked)
 {
-	switch (state) {
-	case RFKILL_STATE_UNBLOCKED:
-			desirec_config_bt_on();
-		break;
-	case RFKILL_STATE_SOFT_BLOCKED:
-			desirec_config_bt_off();
-		break;
-	default:
-		printk(KERN_ERR "bad bluetooth rfkill state %d\n", state);
+	if (!blocked) {
+		desirec_config_bt_on();
+	} else {
+		desirec_config_bt_off();
 	}
 	return 0;
 }
 
-static int __init desirec_rfkill_probe(struct platform_device *pdev)
+static struct rfkill_ops desirec_rfkill_ops = {
+	.set_block = bluetooth_set_power,
+};
+
+static int desirec_rfkill_probe(struct platform_device *pdev)
 {
-	int rc = 0;
-	enum rfkill_state default_state = RFKILL_STATE_SOFT_BLOCKED;  /* off */
+	int rc;
+	bool default_state = true;  /* off */
 
 	desirec_config_bt_init();	/* bt gpio initial config */
 
-	rfkill_set_default(RFKILL_TYPE_BLUETOOTH, default_state);
 	bluetooth_set_power(NULL, default_state);
 
-	bt_rfk = rfkill_allocate(&pdev->dev, RFKILL_TYPE_BLUETOOTH);
+	bt_rfk = rfkill_alloc(bt_name, &pdev->dev, RFKILL_TYPE_BLUETOOTH,
+			      &desirec_rfkill_ops, NULL);
 	if (!bt_rfk)
 		return -ENOMEM;
 
-	bt_rfk->name = bt_name;
-	bt_rfk->state = default_state;
 	/* userspace cannot take exclusive control */
-	bt_rfk->user_claim_unsupported = 1;
-	bt_rfk->user_claim = 0;
-	bt_rfk->data = NULL;  // user data
-	bt_rfk->toggle_radio = bluetooth_set_power;
+	rfkill_set_states(bt_rfk, default_state, false);
 
 	rc = rfkill_register(bt_rfk);
 
 	if (rc)
-		rfkill_free(bt_rfk);
+		rfkill_destroy(bt_rfk);
 	return rc;
 }
 
 static int desirec_rfkill_remove(struct platform_device *dev)
 {
 	rfkill_unregister(bt_rfk);
-	rfkill_free(bt_rfk);
+	rfkill_destroy(bt_rfk);
 
 	return 0;
 }
@@ -202,8 +203,6 @@ static struct platform_driver desirec_rfkill_driver = {
 
 static int __init desirec_rfkill_init(void)
 {
-	if (!machine_is_desirec())
-		return 0;
 	return platform_driver_register(&desirec_rfkill_driver);
 }
 

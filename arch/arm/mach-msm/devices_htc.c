@@ -428,6 +428,50 @@ int __init parse_tag_hwid(const struct tag *tags)
 }
 __tagtable(ATAG_HWID, parse_tag_hwid);
 
+#define ATAG_MONODIE 0x4d534D76
+static int mono_die;;
+int __init parse_tag_monodie(const struct tag *tags)
+{
+	int find = 0;
+	struct tag *t = (struct tag *)tags;
+
+	for (; t->hdr.size; t = tag_next(t)) {
+		if (t->hdr.tag == ATAG_MONODIE) {
+			printk(KERN_DEBUG "find the flash id tag\n");
+			find = 1;
+			break;
+		}
+	}
+
+	if (find)
+		mono_die = t->u.revision.rev;
+	printk(KERN_DEBUG "parse_tag_monodie: mono-die = 0x%x\n", mono_die);
+	return mono_die;
+}
+__tagtable(ATAG_MONODIE, parse_tag_monodie);
+
+int __init board_mcp_monodie(void)
+{
+	return mono_die;
+}
+
+static char *mid_tag = NULL;
+static int __init board_set_mid_tag(char *get_hboot_mid)
+{
+	if(strlen(get_hboot_mid))
+		mid_tag = get_hboot_mid;
+	else
+		mid_tag = NULL;
+	return 1;
+}
+__setup("androidboot.mid=", board_set_mid_tag);
+
+void board_get_mid_tag(char **ret_data)
+{
+	*ret_data = mid_tag;
+}
+EXPORT_SYMBOL(board_get_mid_tag);
+
 static char *keycap_tag = NULL;
 static int __init board_keycaps_tag(char *get_keypads)
 {

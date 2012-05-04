@@ -1,4 +1,4 @@
-/* linux/arch/arm/mach-msm7201a/board-desirec-mmc.c
+/* linux/arch/arm/mach-msm/board-desirec-mmc.c
  *
  * Copyright (C) 2008 HTC Corporation.
  *
@@ -20,18 +20,19 @@
 #include <linux/mmc/sdio_ids.h>
 #include <linux/err.h>
 #include <linux/debugfs.h>
-#include <linux/irq.h>
 #include <linux/gpio.h>
-
-#include <asm/io.h>
+#include <linux/io.h>
 #include <asm/mach/mmc.h>
+#include <asm/mach-types.h>
 
 #include <mach/vreg.h>
-#include "proc_comm.h"
 #include <mach/board.h>
 #include <mach/htc_pwrsink.h>
 
+#include "devices.h"
+#include "gpio_chip.h"
 #include "board-desirec.h"
+#include "proc_comm.h"
 
 #define DEBUG_SDSLOT_VDD 1
 
@@ -100,7 +101,7 @@ static uint32_t desirec_sdslot_switchvdd(struct device *dev, unsigned int vdd)
 
 	if (vdd == 0) {
 #if DEBUG_SDSLOT_VDD
-		printk("%s: Disabling SD slot power\n", __func__);
+		printk(KERN_INFO "%s: Disabling SD slot power\n", __func__);
 #endif
 		config_gpio_table(sdcard_off_gpio_table,
 				  ARRAY_SIZE(sdcard_off_gpio_table));
@@ -121,8 +122,8 @@ static uint32_t desirec_sdslot_switchvdd(struct device *dev, unsigned int vdd)
 	for (i = 0; i < ARRAY_SIZE(mmc_vdd_table); i++) {
 		if (mmc_vdd_table[i].mask == (1 << vdd)) {
 #if DEBUG_SDSLOT_VDD
-			printk("%s: Setting level to %u\n",
-			        __func__, mmc_vdd_table[i].level);
+			printk(KERN_INFO "%s: Setting level to %u\n",
+					__func__, mmc_vdd_table[i].level);
 #endif
 			vreg_set_level(vreg_sdslot, mmc_vdd_table[i].level);
 			return 0;
@@ -147,10 +148,9 @@ static unsigned int desirec_sdslot_type = MMC_TYPE_SD;
 
 static struct mmc_platform_data desirec_sdslot_data = {
 	.ocr_mask	= DESIREC_MMC_VDD,
-	.status_irq	= MSM_GPIO_TO_INT(DESIREC_GPIO_SDMC_CD_N),
 	.status		= desirec_sdslot_status,
 	.translate_vdd	= desirec_sdslot_switchvdd,
-	.slot_type	= &desirec_sdslot_type,
+	.slot_type      = &desirec_sdslot_type,
 };
 
 
@@ -174,11 +174,12 @@ static uint32_t wifi_off_gpio_table[] = {
 	PCOM_GPIO_CFG(54, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* DAT0 */
 	PCOM_GPIO_CFG(55, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* CMD */
 	PCOM_GPIO_CFG(56, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* CLK */
-	PCOM_GPIO_CFG(29, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA),  /* WLAN IRQ */
+	PCOM_GPIO_CFG(29, 0, GPIO_OUTPUT, GPIO_NO_PULL, GPIO_4MA), /* WLAN IRQ */
 };
 
 static struct vreg *vreg_wifi_osc;	/* WIFI 32khz oscilator */
-static int desirec_wifi_cd = 0;		/* WIFI virtual 'card detect' status */
+static int desirec_wifi_cd;		/* WIFI virtual 'card detect' status */
+//static struct vreg *vreg_wifi_batpa;	/* WIFI main power */
 
 static struct sdio_embedded_func wifi_func = {
 	.f_class 	= SDIO_CLASS_WLAN,
@@ -190,7 +191,6 @@ static struct embedded_sdio_data desirec_wifi_emb_data = {
 		.vendor		= 0x104c,
 		.device		= 0x9066,
 		.blksize	= 512,
-		/*.max_dtr	= 24000000,  Max of chip - no worky on Trout */
 		.max_dtr	= 20000000,
 	},
 	.cccr	= {
@@ -207,7 +207,9 @@ static struct embedded_sdio_data desirec_wifi_emb_data = {
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
 
-static int desirec_wifi_status_register(void (*callback)(int card_present, void *dev_id), void *dev_id)
+static int
+desirec_wifi_status_register(void (*callback)(int card_present, void *dev_id),
+				void *dev_id)
 {
 	if (wifi_status_cb)
 		return -EAGAIN;
@@ -230,14 +232,18 @@ static struct mmc_platform_data desirec_wifi_data = {
 
 int desirec_wifi_set_carddetect(int val)
 {
-	printk("%s: %d\n", __func__, val);
+	printk(KERN_INFO "%s: %d\n", __func__, val);
 	desirec_wifi_cd = val;
-	if (wifi_status_cb) {
+	if (wifi_status_cb)
 		wifi_status_cb(val, wifi_status_cb_devid);
-	} else
+	else
 		printk(KERN_WARNING "%s: Nobody to notify\n", __func__);
 	return 0;
 }
+
+#ifndef CONFIG_WIFI_CONTROL_FUNC
+EXPORT_SYMBOL(desirec_wifi_set_carddetect);
+#endif
 
 static int desirec_wifi_power_state;
 static int desirec_bt_power_state;
@@ -246,7 +252,7 @@ int desirec_wifi_power(int on)
 {
 	int rc;
 
-	printk("%s: %d\n", __func__, on);
+	printk(KERN_INFO "%s: %d\n", __func__, on);
 
 	if (on) {
 		config_gpio_table(wifi_on_gpio_table,
@@ -264,42 +270,43 @@ int desirec_wifi_power(int on)
 		htc_pwrsink_set(PWRSINK_WIFI, 0);
 	}
 
-	gpio_set_value( DESIREC_GPIO_WIFI_EN, on);
+	gpio_set_value(DESIREC_GPIO_WIFI_EN, on);
 	mdelay(100);
 
 	if (!on) {
 		if(!desirec_bt_power_state)
-		{
 			vreg_disable(vreg_wifi_osc);
-		}
 		else
-			printk("WiFi shouldn't disable vreg_wifi_osc. BT is using it!!\n");
+			printk(KERN_ERR "WiFi shouldn't disable "
+				"vreg_wifi_osc. BT is using it!!\n");
 	}
 	desirec_wifi_power_state = on;
 	return 0;
 }
+
+#ifndef CONFIG_WIFI_CONTROL_FUNC
+EXPORT_SYMBOL(desirec_wifi_power);
+#endif
 
 /* Eenable VREG_MMC pin to turn on fastclock oscillator : colin */
 int desirec_bt_fastclock_power(int on)
 {
 	int rc;
 
-	printk("%s: %d\n", __func__, on);
+	printk(KERN_INFO "%s: %d\n", __func__, on);
 
 	if (vreg_wifi_osc) {
 		if (on) {
 			rc = vreg_enable(vreg_wifi_osc);
-			
-			if (rc)
-			{
-				printk("Error turn bt_fastclock_power rc=%d\n",rc);
+
+			if (rc)	{
+				printk(KERN_ERR "Error turn "
+					"bt_fastclock_power rc=%d\n", rc);
 				return rc;
 			}
 		} else {
-			if(!desirec_wifi_power_state)
-			{
+			if (!desirec_wifi_power_state)
 				vreg_disable(vreg_wifi_osc);
-			}
 		}
 	}
 	desirec_bt_power_state = on;
@@ -310,38 +317,43 @@ EXPORT_SYMBOL(desirec_bt_fastclock_power);
 static int desirec_wifi_reset_state;
 int desirec_wifi_reset(int on)
 {
-	printk("%s: %d\n", __func__, on);
+	printk(KERN_INFO "%s: %d\n", __func__, on);
 	/* HRRO use power off/on instead wifi reset*/
 	desirec_wifi_reset_state = on;
-	//mdelay(50);
+	/* mdelay(50); */
 	return 0;
 }
+
+#ifndef CONFIG_WIFI_CONTROL_FUNC
+EXPORT_SYMBOL(desirec_wifi_reset);
+#endif
 
 int __init desirec_init_mmc(unsigned int sys_rev)
 {
 	wifi_status_cb = NULL;
 	sdslot_vreg_enabled = 0;
 
-	vreg_sdslot = vreg_get(0, "gp6");
-	if (IS_ERR(vreg_sdslot))
-		return PTR_ERR(vreg_sdslot);
-
 	vreg_wifi_osc = vreg_get(0, "gp4");
 	if (IS_ERR(vreg_wifi_osc))
 		return PTR_ERR(vreg_wifi_osc);
 	vreg_set_level(vreg_wifi_osc, 1800);
 
-	set_irq_wake(MSM_GPIO_TO_INT(DESIREC_GPIO_SDMC_CD_N), 1);
-
 	msm_add_sdcc(1, &desirec_wifi_data, 0, 0); /* r porting 29: change func*/
 
-	if (!opt_disable_sdcard)
-		 msm_add_sdcc(2, &desirec_sdslot_data,
-	        	     MSM_GPIO_TO_INT(DESIREC_GPIO_SDMC_CD_N), IORESOURCE_IRQ_LOWEDGE | IORESOURCE_IRQ_HIGHEDGE); /* r porting 29 */
-
-	else
+	if (opt_disable_sdcard) {
 		printk(KERN_INFO "desirec: SD-Card interface disabled\n");
+		goto done;
+	}
+
+	vreg_sdslot = vreg_get(0, "gp6");
+	if (IS_ERR(vreg_sdslot))
+		return PTR_ERR(vreg_sdslot);
+
+	set_irq_wake(MSM_GPIO_TO_INT(DESIREC_GPIO_SDMC_CD_N), 1);
+
+	msm_add_sdcc(2, &desirec_sdslot_data, MSM_GPIO_TO_INT(DESIREC_GPIO_SDMC_CD_N),
+		IORESOURCE_IRQ_LOWEDGE | IORESOURCE_IRQ_HIGHEDGE); /* r porting 29 */
+
+done:
 	return 0;
 }
-
-

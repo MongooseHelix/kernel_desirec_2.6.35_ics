@@ -348,7 +348,8 @@ obj-$(CONFIG_MACH_CHACHA) += board-chacha-mmc.o board-chacha-wifi.o board-chacha
 # MSM7600 boards
 obj-$(CONFIG_MACH_DESIREC) += board-desirec.o board-desirec-panel.o board-desirec-keypad.o
 obj-$(CONFIG_MACH_DESIREC) += board-desirec-rfkill.o
-obj-$(CONFIG_MACH_DESIREC) += board-desirec-mmc.o board-desirec-wifi.o htc_wifi_nvs.o
+obj-$(CONFIG_MACH_DESIREC) += board-desirec-mmc.o board-desirec-wifi.o htc_wifi_nvs.o htc_awb_cal.o
+obj-$(CONFIG_MACH_DESIREC) += board-desirec-tpa6130.o
 obj-$(CONFIG_MACH_HEROC) += board-heroc.o board-heroc-panel.o board-heroc-keypad.o
 obj-$(CONFIG_MACH_HEROC) += board-heroc-rfkill.o
 obj-$(CONFIG_MACH_HEROC) += board-heroc-mmc.o board-heroc-wifi.o htc_wifi_nvs.o htc_awb_cal.o
