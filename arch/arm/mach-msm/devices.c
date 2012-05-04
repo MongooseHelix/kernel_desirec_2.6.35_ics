@@ -842,6 +842,23 @@ void msm_set_i2c_mux(bool gpio, int *gpio_clk, int *gpio_dat, int clk_str, int d
 	}
 }
 
+static int melfas_reset_pin;
+void set_melfas_reset_pin(int gpio)
+{
+  melfas_reset_pin = gpio;
+}
+
+void reset_melfas(void)
+{
+  if (melfas_reset_pin) {
+    gpio_set_value(melfas_reset_pin, 0);
+    msleep(2);
+    gpio_set_value(melfas_reset_pin, 1);
+    msleep(260);
+  }
+
+}
+
 #define MSM_NAND_PHYS		0xA0A00000
 
 struct flash_platform_data msm_nand_data = {

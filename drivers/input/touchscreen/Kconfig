@@ -370,6 +370,12 @@ config TOUCHSCREEN_SYNAPTICS_I2C_RMI
 	help
 	  This enables support for Synaptics RMI over I2C based touchscreens.
 
+config TOUCHSCREEN_MELFAS_I2C
+	tristate "Melfas i2c touchscreen"
+	depends on I2C
+	help
+	  This enables support for Melfas RMI over I2C based touchscreens.
+
 config TOUCHSCREEN_COMPATIBLE_REPORT
 	bool "Touchscreen compatible report"
 	depends on I2C

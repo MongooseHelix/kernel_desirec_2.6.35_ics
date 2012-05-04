@@ -331,6 +331,7 @@ msm_i2c_recover_bus_busy(struct msm_i2c_dev *dev)
 		return 0;
 	}
 
+	reset_melfas();
 	dev_warn(dev->dev, "Bus still busy, status %x, intf %x\n",
 		 status, readl(dev->base + I2C_INTERFACE_SELECT));
 
